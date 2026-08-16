@@ -86,7 +86,7 @@ func (h *handlers) manifestURL() string {
 }
 
 func fetchManifest(url string) (*updateManifest, error) {
-	client := &http.Client{Timeout: 8 * time.Second}
+	client := &http.Client{Timeout: 30 * time.Second} // 部分网络访问 GitHub 较慢，8s 易误判
 	resp, err := client.Get(url)
 	if err != nil {
 		return nil, fmt.Errorf("获取更新清单失败: %v", err)
