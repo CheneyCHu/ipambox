@@ -1,0 +1,119 @@
+# IPAMBox 发布流水线：打 tag（如 v1.0.1）后自动构建四平台二进制并发布。
+# - linux 在 ubuntu 上用 gcc 原生构建（sqlite 依赖 CGO，跨平台需工具链，CI 最简单）
+# - darwin 在 macos runner 上构建
+# - 产物上传到 GitHub Release，并把 release/latest.json（含 sha256）提交回 main 分支
+# 设备端 OTA 默认读取 main 分支的 release/latest.json。
+name: release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '版本号（如 1.0.1）'
+        required: true
+
+env:
+  VERSION: ${{ github.ref_type == 'tag' && github.ref_name || format('v{0}', inputs.version) }}
+
+jobs:
+  build-frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - name: 构建前端并嵌入
+        run: |
+          cd frontend
+          npm ci || npm install
+          npx vite build
+          rm -rf ../backend/internal/api/web/*
+          cp -r dist/* ../backend/internal/api/web/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: web-embed
+          path: backend/internal/api/web/
+
+  build:
+    needs: build-frontend
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - { os: ubuntu-latest, goos: linux, goarch: amd64 }
+          - { os: ubuntu-latest, goos: linux, goarch: arm64, cc: aarch64-linux-gnu-gcc }
+          - { os: macos-latest, goos: darwin, goarch: arm64 }
+          - { os: macos-13, goos: darwin, goarch: amd64 }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with: { name: web-embed, path: backend/internal/api/web/ }
+      - uses: actions/setup-go@v5
+        with: { go-version: '1.22' }
+      - name: 安装交叉工具链（linux/arm64）
+        if: matrix.cc
+        run: sudo apt-get update && sudo apt-get install -y gcc-aarch64-linux-gnu
+      - name: 构建二进制
+        working-directory: backend
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: 1
+          CC: ${{ matrix.cc || 'gcc' }}
+        run: |
+          go build -trimpath -ldflags "-s -w -X github.com/ipambox/ipambox/internal/build.Version=${VERSION#v}" \
+            -o ../ipambox_${GOOS}_${GOARCH} ./cmd/server
+          ../ipambox_${GOOS}_${GOARCH} -version || true
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ipambox_${{ matrix.goos }}_${{ matrix.goarch }}
+          path: ipambox_${{ matrix.goos }}_${{ matrix.goarch }}
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: 下载全部产物
+        uses: actions/download-artifact@v4
+        with: { pattern: 'ipambox_*', merge-multiple: true }
+      - name: 生成 latest.json（按平台分发，设备自动匹配 GOOS/GOARCH）
+        run: |
+          set -e
+          python3 - <<'PY'
+          import hashlib, json, os
+          plats = {}
+          repo = "${{ github.repository }}"
+          ver = "${VERSION}"
+          for f in sorted(os.listdir(".")):
+              if f.startswith("ipambox_"):
+                  plat = f[len("ipambox_"):]
+                  plats[plat] = {
+                      "url": f"https://github.com/{repo}/releases/download/{ver}/{f}",
+                      "sha256": hashlib.sha256(open(f, "rb").read()).hexdigest(),
+                  }
+          m = {"version": ver.lstrip("v"), "notes": f"IPAMBox {ver}，完整更新说明见 Release 页面", "platforms": plats}
+          open("latest.json", "w").write(json.dumps(m, indent=2, ensure_ascii=False))
+          print(json.dumps(m, indent=2, ensure_ascii=False))
+          PY
+      - name: 发布 Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.VERSION }}
+          name: IPAMBox ${{ env.VERSION }}
+          files: ipambox_*
+          generate_release_notes: true
+      - name: 把 latest.json 提交回 main（设备默认从这里检查更新）
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout main
+          mkdir -p release
+          mv latest.json release/latest.json
+          git add release/latest.json
+          git commit -m "release: ${VERSION} manifest" || echo "清单无变化"
+          git push

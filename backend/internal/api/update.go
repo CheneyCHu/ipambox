@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"syscall"
@@ -18,16 +19,36 @@ import (
 )
 
 // ---- OTA 在线升级 ----
-// 清单（manifest）JSON 格式：
-//   {"version":"1.1.0","url":"https://…/ipambox-linux-arm64","sha256":"…","notes":"…"}
-// 升级流程：下载新二进制 → SHA256 校验 → 原子替换自身 → 重启进程。
+// 清单（manifest）JSON 格式（单平台简写或按平台分发均可）：
+//   {"version":"1.1.0","url":"https://…","sha256":"…","notes":"…"}
+//   {"version":"1.1.0","notes":"…","platforms":{"linux_arm64":{"url":"…","sha256":"…"},…}}
+// 升级流程：按本机 GOOS/GOARCH 选包 → 下载 → SHA256 校验 → 原子替换自身 → 重启。
 // 全程不中断数据库（SQLite 文件不受影响），重启后 token 失效需重新登录。
 
 type updateManifest struct {
-	Version string `json:"version"`
-	URL     string `json:"url"`
-	SHA256  string `json:"sha256"`
-	Notes   string `json:"notes"`
+	Version   string `json:"version"`
+	URL       string `json:"url"`
+	SHA256    string `json:"sha256"`
+	Notes     string `json:"notes"`
+	Platforms map[string]struct {
+		URL    string `json:"url"`
+		SHA256 string `json:"sha256"`
+	} `json:"platforms"`
+}
+
+// forThisDevice 按本机平台取出下载地址与校验和（无平台表时回落顶层字段）。
+func (m *updateManifest) forThisDevice() (url, sha string, err error) {
+	key := runtime.GOOS + "_" + runtime.GOARCH
+	if m.Platforms != nil {
+		if p, ok := m.Platforms[key]; ok && p.URL != "" {
+			return p.URL, p.SHA256, nil
+		}
+		return "", "", fmt.Errorf("更新清单没有适配本机平台（%s）的安装包", key)
+	}
+	if m.URL == "" {
+		return "", "", fmt.Errorf("更新清单缺少下载地址")
+	}
+	return m.URL, m.SHA256, nil
 }
 
 // VersionInfo 当前版本。
@@ -78,8 +99,11 @@ func fetchManifest(url string) (*updateManifest, error) {
 	if err := json.NewDecoder(io.LimitReader(resp.Body, 64<<10)).Decode(&m); err != nil {
 		return nil, fmt.Errorf("更新清单格式错误: %v", err)
 	}
-	if m.Version == "" || m.URL == "" {
-		return nil, fmt.Errorf("更新清单缺少 version/url 字段")
+	if m.Version == "" {
+		return nil, fmt.Errorf("更新清单缺少 version 字段")
+	}
+	if _, _, err := m.forThisDevice(); err != nil {
+		return nil, err
 	}
 	return &m, nil
 }
@@ -117,10 +141,17 @@ func (h *handlers) UpdateApply(w http.ResponseWriter, _ *http.Request) {
 	}
 	exe, _ = filepath.EvalSymlinks(exe)
 
+	// 0. 选本机平台的下载地址
+	dlURL, wantSHA, err := m.forThisDevice()
+	if err != nil {
+		writeErr(w, 502, err)
+		return
+	}
+
 	// 1. 下载到同目录临时文件（同分区，保证 rename 原子）
 	tmp := exe + ".new"
 	client := &http.Client{Timeout: 5 * time.Minute}
-	resp, err := client.Get(m.URL)
+	resp, err := client.Get(dlURL)
 	if err != nil {
 		writeErr(w, 502, fmt.Errorf("下载失败: %v", err))
 		return
@@ -145,10 +176,10 @@ func (h *handlers) UpdateApply(w http.ResponseWriter, _ *http.Request) {
 	}
 
 	// 2. 校验完整性
-	if m.SHA256 != "" {
-		if got := hex.EncodeToString(hasher.Sum(nil)); !strings.EqualFold(got, m.SHA256) {
+	if wantSHA != "" {
+		if got := hex.EncodeToString(hasher.Sum(nil)); !strings.EqualFold(got, wantSHA) {
 			os.Remove(tmp)
-			writeErr(w, 502, fmt.Errorf("SHA256 校验失败（期望 %s，实际 %s）", m.SHA256, got))
+			writeErr(w, 502, fmt.Errorf("SHA256 校验失败（期望 %s，实际 %s）", wantSHA, got))
 			return
 		}
 	}

@@ -143,6 +143,19 @@ check "更新说明透传" "测试版" "$(curl -s $B/update/check -H "$AUTH" | p
 curl -s -X PUT $B/settings/ -H "$AUTH" -d '{"update_manifest_url":"http://127.0.0.1:18334/same.json"}' >/dev/null
 check "同版本无更新" "False" "$(curl -s $B/update/check -H "$AUTH" | pyget "['has_update']")"
 check "已最新时升级 400" "400" "$(curl -s -o /dev/null -w '%{http_code}' -X POST $B/update/apply -H "$AUTH")"
+# 多平台清单：含本机平台可更新；仅异构平台报 502
+PLAT="$(uname -s | tr 'A-Z' 'a-z')_$(uname -m | sed 's/x86_64/amd64/')"
+python3 -c "
+import json
+m={'version':'9.9.9','notes':'多平台','platforms':{'$PLAT':{'url':'http://127.0.0.1:18334/ipambox','sha256':''}}}
+open('$WORK/upd/plat.json','w').write(json.dumps(m))
+m2={'version':'9.9.9','platforms':{'linux_s390x':{'url':'http://x','sha256':''}}}
+open('$WORK/upd/noplat.json','w').write(json.dumps(m2))
+"
+curl -s -X PUT $B/settings/ -H "$AUTH" -d '{"update_manifest_url":"http://127.0.0.1:18334/plat.json"}' >/dev/null
+check "多平台清单匹配本机" "True" "$(curl -s $B/update/check -H "$AUTH" | pyget "['has_update']")"
+curl -s -X PUT $B/settings/ -H "$AUTH" -d '{"update_manifest_url":"http://127.0.0.1:18334/noplat.json"}' >/dev/null
+check "无本机平台包 502" "502" "$(curl -s -o /dev/null -w '%{http_code}' $B/update/check -H "$AUTH")"
 check "清单不可达 502" "502" "$(curl -s -X PUT $B/settings/ -H "$AUTH" -d '{"update_manifest_url":"http://127.0.0.1:9/x.json"}' >/dev/null; curl -s -o /dev/null -w '%{http_code}' $B/update/check -H "$AUTH")"
 curl -s -X PUT $B/settings/ -H "$AUTH" -d '{"update_manifest_url":""}' >/dev/null
 lsof -ti :18334 | xargs kill 2>/dev/null
