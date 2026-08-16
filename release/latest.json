@@ -1,22 +1,22 @@
 {
-  "version": "1.0.0",
-  "notes": "IPAMBox v1.0.0 首个发布版",
+  "version": "${VERSION}",
+  "notes": "IPAMBox ${VERSION}，完整更新说明见 Release 页面",
   "platforms": {
     "darwin_amd64": {
-      "url": "https://github.com/CheneyCHu/ipambox/releases/download/v1.0.0/ipambox_darwin_amd64",
-      "sha256": "7832e5f853687b48bd30b0b685697d8dac1efb0e2d4042d67a18e542bf7d0056"
-    },
-    "linux_amd64": {
-      "url": "https://github.com/CheneyCHu/ipambox/releases/download/v1.0.0/ipambox_linux_amd64",
-      "sha256": "25ab35d08c737b0fb4616cfd58fee36984cb05673349175c3a2ca3cc9422acd4"
-    },
-    "linux_arm64": {
-      "url": "https://github.com/CheneyCHu/ipambox/releases/download/v1.0.0/ipambox_linux_arm64",
-      "sha256": "d8504d7a175e8df8ace0086ca9166d549be808d300f29e942539dc5d8d7411fc"
+      "url": "https://github.com/CheneyCHu/ipambox/releases/download/${VERSION}/ipambox_darwin_amd64",
+      "sha256": "12c35dc3076fa6ec3c3c1cc8dfcb9e3a25c7b896c0e4fe6f19e151841d15f84c"
     },
     "darwin_arm64": {
-      "url": "https://github.com/CheneyCHu/ipambox/releases/download/v1.0.0/ipambox_darwin_arm64",
-      "sha256": "dd4f8571106e3378bc32eac5f1d3cfd7608f8d3702f84df15cd56b64fff4d35a"
+      "url": "https://github.com/CheneyCHu/ipambox/releases/download/${VERSION}/ipambox_darwin_arm64",
+      "sha256": "79bdea8f3965dc8e756e2d17d11facbb8a416b7bc8ae909a9c3167ac9c161b14"
+    },
+    "linux_amd64": {
+      "url": "https://github.com/CheneyCHu/ipambox/releases/download/${VERSION}/ipambox_linux_amd64",
+      "sha256": "58c8581417920d2534b12caf4f692776192d07371a9606c02b3072d933698128"
+    },
+    "linux_arm64": {
+      "url": "https://github.com/CheneyCHu/ipambox/releases/download/${VERSION}/ipambox_linux_arm64",
+      "sha256": "abea7defcdc015b0b500144378d2b7652ae27939d17abc5b1ea09485ec08c796"
     }
   }
 }
