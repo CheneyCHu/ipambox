@@ -41,6 +41,7 @@ jobs:
     needs: build-frontend
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false # 单平台失败不取消其他平台
       matrix:
         include:
           - { os: ubuntu-latest, goos: linux, goarch: amd64 }
@@ -54,8 +55,8 @@ jobs:
         with: { name: web-embed, path: backend/internal/api/web/ }
       - uses: actions/setup-go@v5
         with: { go-version: '1.22' }
-      - name: 安装交叉工具链（linux/arm64）
-        if: matrix.cc
+      - name: 安装交叉工具链（仅 linux 交叉目标）
+        if: matrix.goos == 'linux' && matrix.cc
         run: sudo apt-get update && sudo apt-get install -y gcc-aarch64-linux-gnu
       - name: 构建二进制
         working-directory: backend
