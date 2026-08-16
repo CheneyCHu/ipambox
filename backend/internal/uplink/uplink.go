@@ -109,7 +109,8 @@ func (m *Monitor) CheckNow() Status {
 	case changed && !online:
 		log.Printf("uplink: 外网中断（%s），进入离线自治模式", detail)
 		m.alerter.RaiseRaw("uplink", "warn",
-			"外网连接中断，进入离线自治模式：本地扫描与台账记录不受影响，通知将在网络恢复后补发。")
+			"外网连接中断，进入离线自治模式：本地扫描与台账记录不受影响，通知将在网络恢复后补发。",
+			`{"kind":"down"}`)
 	case changed && online:
 		log.Printf("uplink: 外网已恢复（%s）", detail)
 		m.onRecovered()
@@ -147,7 +148,8 @@ func (m *Monitor) onRecovered() {
 	if failed > 0 {
 		msg += fmt.Sprintf("，%d 条仍待补发", failed)
 	}
-	m.alerter.RaiseRaw("uplink", "info", msg+"。")
+	m.alerter.RaiseRaw("uplink", "info", msg+"。",
+		fmt.Sprintf(`{"kind":"recovered","sent":%d,"failed":%d}`, sent, failed))
 }
 
 // Status 返回当前状态快照。

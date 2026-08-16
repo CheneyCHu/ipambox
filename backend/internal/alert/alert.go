@@ -2,6 +2,7 @@
 package alert
 
 import (
+	"encoding/json"
 	"log"
 	"strconv"
 	"strings"
@@ -33,6 +34,7 @@ func (a *Alerter) CheckConflict(ip, mac string) {
 			Type:    "conflict",
 			Level:   "critical",
 			Message: "IP " + ip + " 的 MAC 由 " + prev + " 变为 " + mac + "，疑似地址冲突",
+			Params:  `{"ip":"` + ip + `","prev":"` + prev + `","mac":"` + mac + `"}`,
 			IP:      ip,
 		})
 	}
@@ -49,17 +51,23 @@ func (a *Alerter) NotifyOffline(subnetCIDR string, ips []string) {
 		show = ips[:5]
 		suffix = " 等共 " + strconv.Itoa(len(ips)) + " 个"
 	}
+	params, _ := json.Marshal(map[string]any{"cidr": subnetCIDR, "ips": ips, "count": len(ips)})
 	a.raise(&models.Alert{
 		Type:    "offline",
 		Level:   "warn",
 		Message: subnetCIDR + " 有设备离线：" + strings.Join(show, "、") + suffix,
+		Params:  string(params),
 		IP:      ips[0],
 	})
 }
 
 // RaiseRaw 供 uplink 等模块直接产生一条告警（走统一的落库+推送流程）。
-func (a *Alerter) RaiseRaw(alertType, level, message string) {
-	a.raise(&models.Alert{Type: alertType, Level: level, Message: message})
+func (a *Alerter) RaiseRaw(alertType, level, message string, params ...string) {
+	p := ""
+	if len(params) > 0 {
+		p = params[0]
+	}
+	a.raise(&models.Alert{Type: alertType, Level: level, Message: message, Params: p})
 }
 
 // raise 落库并按配置推送通知；推送失败进入待补发队列（断网续存）。

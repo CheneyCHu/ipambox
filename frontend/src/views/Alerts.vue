@@ -1,10 +1,38 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { api, type Alert } from '../api'
-import { t } from '../i18n'
+import { t, lang } from '../i18n'
 
 const alerts = ref<Alert[]>([])
 onMounted(async () => { alerts.value = await api.alerts().catch(() => []) })
+
+// 按当前语言渲染告警内容：英文优先用 params 重组，缺失时回退原始中文消息
+function msgOf(a: Alert): string {
+  if (lang.value === 'zh' || !a.params) return a.message
+  let p: any = null
+  try { p = JSON.parse(a.params) } catch { return a.message }
+  switch (a.type) {
+    case 'conflict':
+      return `MAC of IP ${p.ip} changed from ${p.prev} to ${p.mac}, possible address conflict`
+    case 'offline': {
+      const ips: string[] = p.ips || []
+      const show = ips.slice(0, 5).join(', ')
+      const more = ips.length > 5 ? ` and ${ips.length} in total` : ''
+      return `${p.cidr}: devices went offline: ${show}${more}`
+    }
+    case 'uplink':
+      if (p.kind === 'down')
+        return 'Internet connection lost. Entering offline-autonomy mode: local scanning and inventory keep working; notifications will be queued and resent after recovery.'
+      if (p.kind === 'recovered') {
+        let s = `Internet connection recovered. Resent ${p.sent} notification(s)`
+        if (p.failed > 0) s += `, ${p.failed} still pending`
+        return s + '.'
+      }
+      return a.message
+    default:
+      return a.message
+  }
+}
 </script>
 
 <template>
@@ -25,7 +53,7 @@ onMounted(async () => { alerts.value = await api.alerts().catch(() => []) })
         <div class="flex-1 min-w-0">
           <p class="text-sm">
             <span class="font-mono font-medium text-slate-800">{{ a.ip }}</span>
-            <span :class="a.read ? 'text-slate-400' : 'text-slate-600'" class="ml-2">{{ a.message }}</span>
+            <span :class="a.read ? 'text-slate-400' : 'text-slate-600'" class="ml-2">{{ msgOf(a) }}</span>
           </p>
           <p class="text-xs text-slate-400 mt-1">{{ a.created_at }}
             <span :class="['ml-2 rounded-full px-2 py-0.5 font-medium', a.level === 'critical' ? 'bg-red-50 text-conflict' : 'bg-orange-50 text-rogue']">

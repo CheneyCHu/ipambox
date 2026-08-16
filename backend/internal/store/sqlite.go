@@ -50,6 +50,7 @@ CREATE TABLE IF NOT EXISTS alerts (
   type TEXT NOT NULL,
   level TEXT NOT NULL DEFAULT 'info',
   message TEXT NOT NULL,
+  params TEXT NOT NULL DEFAULT '',
   ip TEXT NOT NULL DEFAULT '',
   read INTEGER NOT NULL DEFAULT 0,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -114,6 +115,27 @@ func Open(path string) (*Store, error) {
 	if !hasIface {
 		if _, err := db.Exec(`ALTER TABLE subnets ADD COLUMN iface TEXT NOT NULL DEFAULT ''`); err != nil {
 			return nil, fmt.Errorf("migrate iface: %w", err)
+		}
+	}
+	// 增量迁移：为 alerts 增加 params 列（已存在则忽略）
+	var hasParams bool
+	rows2, err := db.Query(`PRAGMA table_info(alerts)`)
+	if err != nil {
+		return nil, err
+	}
+	for rows2.Next() {
+		var cid int
+		var name, ctype string
+		var notnull, pk int
+		var dflt sql.NullString
+		if err := rows2.Scan(&cid, &name, &ctype, &notnull, &dflt, &pk); err == nil && name == "params" {
+			hasParams = true
+		}
+	}
+	rows2.Close()
+	if !hasParams {
+		if _, err := db.Exec(`ALTER TABLE alerts ADD COLUMN params TEXT NOT NULL DEFAULT ''`); err != nil {
+			return nil, fmt.Errorf("migrate alerts params: %w", err)
 		}
 	}
 	return &Store{db: db, path: path}, nil
@@ -487,13 +509,13 @@ func (s *Store) MarkSeen(ip, mac, hostname, source string) error {
 // ---- 告警 ----
 
 func (s *Store) CreateAlert(a *models.Alert) error {
-	_, err := s.db.Exec(`INSERT INTO alerts(type,level,message,ip) VALUES(?,?,?,?)`,
-		a.Type, a.Level, a.Message, a.IP)
+	_, err := s.db.Exec(`INSERT INTO alerts(type,level,message,params,ip) VALUES(?,?,?,?,?)`,
+		a.Type, a.Level, a.Message, a.Params, a.IP)
 	return err
 }
 
 func (s *Store) ListAlerts(unreadOnly bool) ([]models.Alert, error) {
-	q := `SELECT id,type,level,message,ip,read,created_at FROM alerts`
+	q := `SELECT id,type,level,message,params,ip,read,created_at FROM alerts`
 	if unreadOnly {
 		q += ` WHERE read=0`
 	}
@@ -506,7 +528,7 @@ func (s *Store) ListAlerts(unreadOnly bool) ([]models.Alert, error) {
 	out := []models.Alert{}
 	for rows.Next() {
 		var a models.Alert
-		if err := rows.Scan(&a.ID, &a.Type, &a.Level, &a.Message, &a.IP, &a.Read, &a.CreatedAt); err != nil {
+		if err := rows.Scan(&a.ID, &a.Type, &a.Level, &a.Message, &a.Params, &a.IP, &a.Read, &a.CreatedAt); err != nil {
 			return nil, err
 		}
 		out = append(out, a)

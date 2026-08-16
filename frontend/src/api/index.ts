@@ -84,6 +84,7 @@ export interface Alert {
   type: string
   level: string
   message: string
+  params?: string
   ip?: string
   read: boolean
   created_at: string

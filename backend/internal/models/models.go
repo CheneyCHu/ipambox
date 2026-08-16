@@ -57,6 +57,7 @@ type Alert struct {
 	Type      string    `json:"type"` // conflict / new_device / offline / capacity
 	Level     string    `json:"level"` // info / warn / critical
 	Message   string    `json:"message"`
+	Params    string    `json:"params,omitempty"` // JSON 参数，供前端按语言渲染
 	IP        string    `json:"ip,omitempty"`
 	Read      bool      `json:"read"`
 	CreatedAt time.Time `json:"created_at"`
