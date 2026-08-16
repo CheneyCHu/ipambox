@@ -91,7 +91,7 @@ jobs:
           import hashlib, json, os
           plats = {}
           repo = "${{ github.repository }}"
-          ver = "${VERSION}"
+          ver = os.environ["VERSION"]  # heredoc 已加引号，shell 不展开，必须从环境变量取
           for f in sorted(os.listdir(".")):
               if f.startswith("ipambox_"):
                   plat = f[len("ipambox_"):]
