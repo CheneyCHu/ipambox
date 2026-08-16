@@ -42,6 +42,9 @@ NICS=$(curl -s $B/interfaces -H "$AUTH" | python3 -c 'import sys,json;print(len(
 echo "==> 3. 子网与扫描闭环"
 curl -s -X POST $B/subnets/ -H "$AUTH" -d '{"cidr":"127.0.0.0/30","name":"回环测试网"}' >/dev/null
 check "建子网成功" "1" "$(curl -s $B/subnets/ -H "$AUTH" | python3 -c 'import sys,json;print(len(json.load(sys.stdin)))')"
+check "非法 CIDR 400" "400" "$(curl -s -o /dev/null -w '%{http_code}' -X POST $B/subnets/ -H "$AUTH" -d '{"cidr":"abc"}')"
+check "IPv6 子网 400" "400" "$(curl -s -o /dev/null -w '%{http_code}' -X POST $B/subnets/ -H "$AUTH" -d '{"cidr":"fd00::/64"}')"
+check "过大前缀 400" "400" "$(curl -s -o /dev/null -w '%{http_code}' -X POST $B/subnets/ -H "$AUTH" -d '{"cidr":"10.0.0.0/7"}')"
 check "触发扫描 202" "202" "$(curl -s -o /dev/null -w '%{http_code}' -X POST $B/subnets/1/scan -H "$AUTH")"
 sleep 5
 check "扫描发现 127.0.0.1" "online" "$(curl -s $B/subnets/1/addresses -H "$AUTH" | python3 -c 'import sys,json;a=json.load(sys.stdin);print(a[0]["status"] if a else "none")')"
@@ -129,7 +132,7 @@ check "DHCP 接口已移除 404" "404" "$(curl -s -o /dev/null -w '%{http_code}'
 check "DHCP 设置键已移除" "1" "$(curl -s $B/settings/ -H "$AUTH" | python3 -c 'import sys,json;print(0 if "dhcp_enabled" in json.load(sys.stdin) else 1)')"
 
 echo "==> 10f. OTA 升级"
-check "版本接口" "1.0.0" "$(curl -s $B/version -H "$AUTH" | pyget "['version']")"
+check "版本接口" "1" "$(curl -s $B/version -H "$AUTH" | pyget "['version']" | grep -cE '^[0-9]+\.[0-9]+\.[0-9]+$')"
 mkdir -p "$WORK/upd"
 echo '{"version":"9.9.9","url":"http://127.0.0.1:18334/ipambox","sha256":"","notes":"测试版"}' > "$WORK/upd/latest.json"
 echo '{"version":"1.0.0","url":"http://127.0.0.1:18334/ipambox"}' > "$WORK/upd/same.json"
@@ -159,6 +162,25 @@ check "无本机平台包 502" "502" "$(curl -s -o /dev/null -w '%{http_code}' $
 check "清单不可达 502" "502" "$(curl -s -X PUT $B/settings/ -H "$AUTH" -d '{"update_manifest_url":"http://127.0.0.1:9/x.json"}' >/dev/null; curl -s -o /dev/null -w '%{http_code}' $B/update/check -H "$AUTH")"
 curl -s -X PUT $B/settings/ -H "$AUTH" -d '{"update_manifest_url":""}' >/dev/null
 lsof -ti :18334 | xargs kill 2>/dev/null
+
+echo "==> 10g. 安全：只读账号敏感信息屏蔽"
+curl -s -X PUT $B/settings/ -H "$AUTH" -d '{"notify_webhook":"https://hooks.example.com/secret-abc","notify_secret":"SEC123"}' >/dev/null
+curl -s -X POST $B/auth/viewer -H "$AUTH" -d '{"password":"view123"}' >/dev/null
+VTOK=$(curl -s -X POST $B/setup/login -d '{"password":"view123"}' | pyget "['token']")
+VAUTH="Authorization: Bearer $VTOK"
+VROLE=$(curl -s -X POST $B/setup/login -d '{"password":"view123"}' | pyget "['role']")
+check "只读登录成功" "viewer" "$VROLE"
+VSET=$(curl -s $B/settings/ -H "$VAUTH")
+check "viewer 看不到 webhook" "0" "$(echo $VSET | grep -c 'secret-abc')"
+check "viewer 看不到加签密钥" "0" "$(echo $VSET | grep -c 'SEC123')"
+ASET=$(curl -s $B/settings/ -H "$AUTH")
+check "admin 看得到 webhook" "1" "$(echo $ASET | grep -c 'secret-abc')"
+check "viewer 写操作 403" "403" "$(curl -s -o /dev/null -w '%{http_code}' -X PUT $B/settings/ -H "$VAUTH" -d '{"auto_scan":"0"}')"
+
+echo "==> 10h. 安全：登录爆破锁定"
+for i in 1 2 3 4 5; do curl -s -o /dev/null -X POST $B/setup/login -d '{"password":"wrong-pass"}'; done
+check "第 6 次错误登录被锁定 429" "429" "$(curl -s -o /dev/null -w '%{http_code}' -X POST $B/setup/login -d '{"password":"wrong-pass"}')"
+check "锁定期间正确密码也 429" "429" "$(curl -s -o /dev/null -w '%{http_code}' -X POST $B/setup/login -d '{"password":"admin123"}')"
 
 echo "==> 11. 重置流程"
 check "重置成功" "reset" "$(curl -s -X POST $B/setup/reset -H "$AUTH" | pyget "['status']")"

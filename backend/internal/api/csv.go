@@ -55,6 +55,7 @@ func (h *handlers) ExportSubnetCSV(w http.ResponseWriter, r *http.Request) {
 // 请求体为 CSV 文本（与导出格式一致），按 ip 匹配更新。
 func (h *handlers) ImportCSV(w http.ResponseWriter, r *http.Request) {
 	id, _ := idParam(r)
+	r.Body = http.MaxBytesReader(w, r.Body, 32<<20) // 上限 32MB，防内存耗尽
 	cr := csv.NewReader(r.Body)
 	rows, err := cr.ReadAll()
 	if err != nil {

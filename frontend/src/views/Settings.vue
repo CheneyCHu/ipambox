@@ -282,39 +282,74 @@ async function test() {
     msg.value = t('✅ 连通成功，模型回复：') + reply
   } catch (e: any) { msg.value = '❌ ' + e.message } finally { testing.value = false }
 }
+
+// ---- 页面分组锚点导航 ----
+const sections = [
+  { id: 'scan', icon: '🕐', zh: '扫描与网络', en: 'Scan & Network' },
+  { id: 'notify', icon: '🔔', zh: '通知推送', en: 'Notifications' },
+  { id: 'dict', icon: '🏷️', zh: '台账字典', en: 'Dictionaries' },
+  { id: 'account', icon: '👁️', zh: '账号与安全', en: 'Account & Security' },
+  { id: 'backup', icon: '💾', zh: '数据备份', en: 'Backup' },
+  { id: 'ai', icon: '✨', zh: 'AI 助手', en: 'AI Assistant' },
+  { id: 'update', icon: '⬇️', zh: '系统升级', en: 'System Update' },
+  { id: 'danger', icon: '⚠️', zh: '危险区', en: 'Danger Zone' },
+] as const
+
+function jump(id: string) {
+  document.getElementById('sec-' + id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
 </script>
-
 <template>
-  <div class="max-w-2xl animate-fade-in">
-    <header class="mb-5">
-      <h1 class="text-2xl font-bold text-slate-900 tracking-tight">{{ t('设置') }}</h1>
-      <p class="text-sm text-slate-400 mt-1">{{ t('扫描、通知与 AI 助手配置') }}</p>
-    </header>
+  <div class="animate-fade-in flex gap-8 items-start">
+    <!-- 左侧分组导航（宽屏显示） -->
+    <aside class="w-48 shrink-0 sticky top-8 hidden lg:block">
+      <h1 class="text-2xl font-bold text-slate-900 tracking-tight px-3">{{ t('设置') }}</h1>
+      <p class="text-xs text-slate-400 mt-1 mb-4 px-3">{{ t('扫描、通知与 AI 助手配置') }}</p>
+      <nav class="space-y-0.5">
+        <button v-for="s in sections" :key="s.id" @click="jump(s.id)"
+                class="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm text-slate-500 hover:bg-white hover:text-slate-800 hover:shadow-card transition text-left">
+          <span class="text-base leading-none">{{ s.icon }}</span>{{ t(s.zh) }}
+        </button>
+      </nav>
+    </aside>
 
-    <div class="grid grid-cols-2 gap-4 mb-5">
-      <section class="bg-white rounded-2xl shadow-card border border-slate-100 p-5">
-        <span class="w-9 h-9 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center mb-3">
-          <svg viewBox="0 0 24 24" class="w-5 h-5" fill="currentColor"><path d="M12 2a10 10 0 100 20 10 10 0 000-20zm1 10.6l4.2 2.4-.8 1.3L11 13.5V7h2v5.6z"/></svg>
-        </span>
-        <h2 class="font-semibold text-slate-800 mb-3">{{ t('扫描计划') }}</h2>
-        <label class="flex items-center justify-between text-sm text-slate-600 mb-3 cursor-pointer">
+    <div class="flex-1 min-w-0 max-w-3xl">
+      <header class="mb-5 lg:hidden">
+        <h1 class="text-2xl font-bold text-slate-900 tracking-tight">{{ t('设置') }}</h1>
+        <p class="text-sm text-slate-400 mt-1">{{ t('扫描、通知与 AI 助手配置') }}</p>
+      </header>
+
+      <!-- ========== 扫描与网络 ========== -->
+      <section id="sec-scan" class="bg-white rounded-2xl shadow-card border border-slate-100 p-6 mb-5 scroll-mt-6">
+        <div class="flex items-center gap-3 mb-4">
+          <span class="w-9 h-9 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center shrink-0">
+            <svg viewBox="0 0 24 24" class="w-5 h-5" fill="currentColor"><path d="M12 2a10 10 0 100 20 10 10 0 000-20zm1 10.6l4.2 2.4-.8 1.3L11 13.5V7h2v5.6z"/></svg>
+          </span>
+          <div>
+            <h2 class="font-semibold text-slate-800">{{ t('扫描计划') }}</h2>
+            <p class="text-xs text-slate-400">{{ t('定时自动扫描') }} · {{ t('外网连通探测（断网续存）') }}</p>
+          </div>
+        </div>
+        <label class="flex items-center justify-between text-sm text-slate-600 mb-3 cursor-pointer max-w-sm">
           {{ t('定时自动扫描') }}
           <button @click="autoScan = !autoScan" type="button"
-                  :class="['w-10 h-6 rounded-full transition relative', autoScan ? 'bg-brand-600' : 'bg-slate-200']">
+                  :class="['w-10 h-6 rounded-full transition relative shrink-0', autoScan ? 'bg-brand-600' : 'bg-slate-200']">
             <i :class="['absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-all', autoScan ? 'left-5' : 'left-1']"></i>
           </button>
         </label>
-        <label class="block text-sm text-slate-600 mb-3">{{ t('扫描间隔（分钟）') }}
+        <label class="block text-sm text-slate-600 mb-3 max-w-sm">{{ t('扫描间隔（分钟）') }}
           <input v-model.number="scanInterval" type="number" min="1" max="1440" :disabled="!autoScan"
                  class="border border-slate-200 rounded-xl w-full px-3 py-2 mt-1.5 font-normal disabled:opacity-40" /></label>
         <div class="border-t border-slate-100 pt-3 mb-3">
           <p class="text-xs font-medium text-slate-500 mb-2">{{ t('外网连通探测（断网续存）') }}</p>
-          <label class="block text-sm text-slate-600 mb-2">{{ t('探测目标（host:port，逗号分隔）') }}
-            <input v-model="uplinkProbe" placeholder="223.5.5.5:53,114.114.114.114:53"
-                   class="border border-slate-200 rounded-xl w-full px-3 py-2 mt-1 font-mono font-normal text-xs" /></label>
-          <label class="block text-sm text-slate-600">{{ t('探测间隔（秒）') }}
-            <input v-model.number="uplinkCheckSec" type="number" min="5" max="3600"
-                   class="border border-slate-200 rounded-xl w-full px-3 py-2 mt-1.5 font-normal" /></label>
+          <div class="grid sm:grid-cols-2 gap-3">
+            <label class="block text-sm text-slate-600">{{ t('探测目标（host:port，逗号分隔）') }}
+              <input v-model="uplinkProbe" placeholder="223.5.5.5:53,114.114.114.114:53"
+                     class="border border-slate-200 rounded-xl w-full px-3 py-2 mt-1 font-mono font-normal text-xs" /></label>
+            <label class="block text-sm text-slate-600">{{ t('探测间隔（秒）') }}
+              <input v-model.number="uplinkCheckSec" type="number" min="5" max="3600"
+                     class="border border-slate-200 rounded-xl w-full px-3 py-2 mt-1 font-normal" /></label>
+          </div>
           <p class="text-[11px] text-slate-400 mt-1.5">{{ t('离线期间扫描与台账照常记录，通知暂存队列、恢复后自动补发。') }}</p>
         </div>
         <button @click="saveScan" :disabled="scanSaving"
@@ -323,29 +358,38 @@ async function test() {
         </button>
         <p v-if="scanMsg" class="text-xs mt-2 text-slate-500">{{ scanMsg }}</p>
       </section>
-      <section class="bg-white rounded-2xl shadow-card border border-slate-100 p-5">
-        <span class="w-9 h-9 rounded-xl bg-purple-50 text-reserved flex items-center justify-center mb-3">
-          <svg viewBox="0 0 24 24" class="w-5 h-5" fill="currentColor"><path d="M12 2a7 7 0 00-7 7v4l-2 3v1h18v-1l-2-3V9a7 7 0 00-7-7zm-2 16a2 2 0 104 0h-4z"/></svg>
-        </span>
-        <h2 class="font-semibold text-slate-800 mb-3">{{ t('通知渠道') }}</h2>
-        <label class="flex items-center justify-between text-sm text-slate-600 mb-3 cursor-pointer">
+
+      <!-- ========== 通知推送 ========== -->
+      <section id="sec-notify" class="bg-white rounded-2xl shadow-card border border-slate-100 p-6 mb-5 scroll-mt-6">
+        <div class="flex items-center gap-3 mb-4">
+          <span class="w-9 h-9 rounded-xl bg-purple-50 text-reserved flex items-center justify-center shrink-0">
+            <svg viewBox="0 0 24 24" class="w-5 h-5" fill="currentColor"><path d="M12 2a7 7 0 00-7 7v4l-2 3v1h18v-1l-2-3V9a7 7 0 00-7-7zm-2 16a2 2 0 104 0h-4z"/></svg>
+          </span>
+          <div>
+            <h2 class="font-semibold text-slate-800">{{ t('通知渠道') }}</h2>
+            <p class="text-xs text-slate-400">{{ t('启用告警推送') }} · Webhook / {{ t('钉钉群机器人') }} / {{ t('企业微信群机器人') }}</p>
+          </div>
+        </div>
+        <label class="flex items-center justify-between text-sm text-slate-600 mb-3 cursor-pointer max-w-sm">
           {{ t('启用告警推送') }}
           <button @click="notifyEnabled = !notifyEnabled" type="button"
-                  :class="['w-10 h-6 rounded-full transition relative', notifyEnabled ? 'bg-brand-600' : 'bg-slate-200']">
+                  :class="['w-10 h-6 rounded-full transition relative shrink-0', notifyEnabled ? 'bg-brand-600' : 'bg-slate-200']">
             <i :class="['absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-all', notifyEnabled ? 'left-5' : 'left-1']"></i>
           </button>
         </label>
         <div :class="[!notifyEnabled && 'opacity-40 pointer-events-none']">
-          <label class="block text-sm text-slate-600 mb-2">{{ t('渠道') }}
-            <select v-model="notifyChannel" class="border border-slate-200 rounded-xl w-full px-3 py-2 mt-1 font-normal bg-white">
-              <option value="webhook">{{ t('通用 Webhook（JSON）') }}</option>
-              <option value="dingtalk">{{ t('钉钉群机器人') }}</option>
-              <option value="wecom">{{ t('企业微信群机器人') }}</option>
-            </select></label>
-          <label class="block text-sm text-slate-600 mb-2">{{ t('Webhook 地址') }}
-            <input v-model="notifyWebhook" placeholder="https://..."
-                   class="border border-slate-200 rounded-xl w-full px-3 py-2 mt-1 font-mono font-normal text-xs" /></label>
-          <label v-if="notifyChannel === 'dingtalk'" class="block text-sm text-slate-600 mb-2">{{ t('加签密钥（可选）') }}
+          <div class="grid sm:grid-cols-2 gap-3 mb-3">
+            <label class="block text-sm text-slate-600">{{ t('渠道') }}
+              <select v-model="notifyChannel" class="border border-slate-200 rounded-xl w-full px-3 py-2 mt-1 font-normal bg-white">
+                <option value="webhook">{{ t('通用 Webhook（JSON）') }}</option>
+                <option value="dingtalk">{{ t('钉钉群机器人') }}</option>
+                <option value="wecom">{{ t('企业微信群机器人') }}</option>
+              </select></label>
+            <label class="block text-sm text-slate-600">{{ t('Webhook 地址') }}
+              <input v-model="notifyWebhook" placeholder="https://..."
+                     class="border border-slate-200 rounded-xl w-full px-3 py-2 mt-1 font-mono font-normal text-xs" /></label>
+          </div>
+          <label v-if="notifyChannel === 'dingtalk'" class="block text-sm text-slate-600 mb-3 max-w-sm">{{ t('加签密钥（可选）') }}
             <input v-model="notifySecret" :placeholder="t('SEC 开头')"
                    class="border border-slate-200 rounded-xl w-full px-3 py-2 mt-1 font-mono font-normal text-xs" /></label>
           <div class="flex items-center gap-3 text-sm text-slate-600 mb-3">
@@ -371,220 +415,225 @@ async function test() {
         </div>
         <p v-if="notifyMsg" class="text-xs mt-2 text-slate-500 break-all">{{ notifyMsg }}</p>
       </section>
-    </div>
 
-    <!-- 台账字典 -->
-    <div class="grid grid-cols-2 gap-4 mb-5">
-      <section class="bg-white rounded-2xl shadow-card border border-slate-100 p-5">
-        <span class="w-9 h-9 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center mb-3">
-          <svg viewBox="0 0 24 24" class="w-5 h-5" fill="currentColor"><path d="M4 5h16a1 1 0 011 1v9a1 1 0 01-1 1h-7v2h3v2H8v-2h3v-2H4a1 1 0 01-1-1V6a1 1 0 011-1zm1 2v7h14V7H5z"/></svg>
-        </span>
-        <h2 class="font-semibold text-slate-800 mb-3">{{ t('设备类型') }}</h2>
-        <div class="flex flex-wrap gap-1.5 mb-3">
-          <template v-for="(tp, i) in devTypes" :key="tp">
-            <input v-if="renaming && renaming.kind === 'dev_types' && renaming.index === i"
-                   v-model="renaming.value" @keyup.enter="commitRename" @keyup.esc="renaming = null" @blur="commitRename"
-                   class="border border-brand-300 rounded-full px-2.5 py-1 text-xs w-24 outline-none" />
-            <span v-else @click="startRename('dev_types', i)" :title="t('点击重命名')"
-                  class="bg-slate-100 hover:bg-brand-50 text-slate-600 text-xs rounded-full pl-2.5 pr-1.5 py-1 flex items-center gap-1 cursor-pointer transition">
-              {{ tp }}
-              <button @click.stop="removeItem('dev_types', i)" class="text-slate-300 hover:text-conflict font-bold leading-none">×</button>
-            </span>
-          </template>
-          <span v-if="!devTypes.length" class="text-xs text-slate-300">{{ t('暂无，请在下方添加') }}</span>
+      <!-- ========== 台账字典 ========== -->
+      <section id="sec-dict" class="bg-white rounded-2xl shadow-card border border-slate-100 p-6 mb-5 scroll-mt-6">
+        <div class="flex items-center gap-3 mb-1">
+          <span class="w-9 h-9 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center shrink-0">
+            <svg viewBox="0 0 24 24" class="w-5 h-5" fill="currentColor"><path d="M4 5h16a1 1 0 011 1v9a1 1 0 01-1 1h-7v2h3v2H8v-2h3v-2H4a1 1 0 01-1-1V6a1 1 0 011-1zm1 2v7h14V7H5z"/></svg>
+          </span>
+          <div>
+            <h2 class="font-semibold text-slate-800">{{ t('台账字典') }}</h2>
+            <p class="text-xs text-slate-400">{{ t('点击标签可重命名（台账引用会同步更新）；增删即时生效。') }}</p>
+          </div>
         </div>
-        <div class="flex gap-2">
-          <input v-model="newType" @keyup.enter="addItem('dev_types', newType)" :placeholder="t('新类型，回车添加')"
-                 class="border border-slate-200 rounded-xl flex-1 px-3 py-1.5 text-sm" />
-          <button @click="addItem('dev_types', newType)" class="border border-slate-200 rounded-xl px-3 text-sm text-slate-500 hover:border-brand-400 hover:text-brand-600 transition">{{ t('添加') }}</button>
+        <div class="grid sm:grid-cols-2 gap-6 mt-4">
+          <div>
+            <h3 class="text-sm font-medium text-slate-600 mb-2">{{ t('设备类型') }}</h3>
+            <div class="flex flex-wrap gap-1.5 mb-3">
+              <template v-for="(tp, i) in devTypes" :key="tp">
+                <input v-if="renaming && renaming.kind === 'dev_types' && renaming.index === i"
+                       v-model="renaming.value" @keyup.enter="commitRename" @keyup.esc="renaming = null" @blur="commitRename"
+                       class="border border-brand-300 rounded-full px-2.5 py-1 text-xs w-24 outline-none" />
+                <span v-else @click="startRename('dev_types', i)" :title="t('点击重命名')"
+                      class="bg-slate-100 hover:bg-brand-50 text-slate-600 text-xs rounded-full pl-2.5 pr-1.5 py-1 flex items-center gap-1 cursor-pointer transition">
+                  {{ tp }}
+                  <button @click.stop="removeItem('dev_types', i)" class="text-slate-300 hover:text-conflict font-bold leading-none">×</button>
+                </span>
+              </template>
+              <span v-if="!devTypes.length" class="text-xs text-slate-300">{{ t('暂无，请在下方添加') }}</span>
+            </div>
+            <div class="flex gap-2">
+              <input v-model="newType" @keyup.enter="addItem('dev_types', newType)" :placeholder="t('新类型，回车添加')"
+                     class="border border-slate-200 rounded-xl flex-1 px-3 py-1.5 text-sm" />
+              <button @click="addItem('dev_types', newType)" class="border border-slate-200 rounded-xl px-3 text-sm text-slate-500 hover:border-brand-400 hover:text-brand-600 transition">{{ t('添加') }}</button>
+            </div>
+          </div>
+          <div>
+            <h3 class="text-sm font-medium text-slate-600 mb-2">{{ t('负责人') }}</h3>
+            <div class="flex flex-wrap gap-1.5 mb-3">
+              <template v-for="(o, i) in owners" :key="o">
+                <input v-if="renaming && renaming.kind === 'owners' && renaming.index === i"
+                       v-model="renaming.value" @keyup.enter="commitRename" @keyup.esc="renaming = null" @blur="commitRename"
+                       class="border border-brand-300 rounded-full px-2.5 py-1 text-xs w-24 outline-none" />
+                <span v-else @click="startRename('owners', i)" :title="t('点击重命名')"
+                      class="bg-slate-100 hover:bg-brand-50 text-slate-600 text-xs rounded-full pl-2.5 pr-1.5 py-1 flex items-center gap-1 cursor-pointer transition">
+                  {{ o }}
+                  <button @click.stop="removeItem('owners', i)" class="text-slate-300 hover:text-conflict font-bold leading-none">×</button>
+                </span>
+              </template>
+              <span v-if="!owners.length" class="text-xs text-slate-300">{{ t('暂无，请在下方添加') }}</span>
+            </div>
+            <div class="flex gap-2">
+              <input v-model="newOwner" @keyup.enter="addItem('owners', newOwner)" :placeholder="t('新负责人，回车添加')"
+                     class="border border-slate-200 rounded-xl flex-1 px-3 py-1.5 text-sm" />
+              <button @click="addItem('owners', newOwner)" class="border border-slate-200 rounded-xl px-3 text-sm text-slate-500 hover:border-brand-400 hover:text-brand-600 transition">{{ t('添加') }}</button>
+            </div>
+          </div>
         </div>
-        <p class="text-xs text-slate-400 mt-2">{{ t('点击标签可重命名（台账引用会同步更新）；增删即时生效。') }}</p>
+        <p v-if="dictMsg" class="text-xs text-slate-500 mt-3">{{ dictMsg }}</p>
       </section>
 
-      <section class="bg-white rounded-2xl shadow-card border border-slate-100 p-5">
-        <span class="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center mb-3">
-          <svg viewBox="0 0 24 24" class="w-5 h-5" fill="currentColor"><path d="M12 12a4 4 0 100-8 4 4 0 000 8zm0 2c-4 0-7 2-7 4v2h14v-2c0-2-3-4-7-4z"/></svg>
-        </span>
-        <h2 class="font-semibold text-slate-800 mb-3">{{ t('负责人') }}</h2>
-        <div class="flex flex-wrap gap-1.5 mb-3">
-          <template v-for="(o, i) in owners" :key="o">
-            <input v-if="renaming && renaming.kind === 'owners' && renaming.index === i"
-                   v-model="renaming.value" @keyup.enter="commitRename" @keyup.esc="renaming = null" @blur="commitRename"
-                   class="border border-brand-300 rounded-full px-2.5 py-1 text-xs w-24 outline-none" />
-            <span v-else @click="startRename('owners', i)" :title="t('点击重命名')"
-                  class="bg-slate-100 hover:bg-brand-50 text-slate-600 text-xs rounded-full pl-2.5 pr-1.5 py-1 flex items-center gap-1 cursor-pointer transition">
-              {{ o }}
-              <button @click.stop="removeItem('owners', i)" class="text-slate-300 hover:text-conflict font-bold leading-none">×</button>
-            </span>
+      <!-- ========== 账号与安全 ========== -->
+      <section id="sec-account" class="bg-white rounded-2xl shadow-card border border-slate-100 p-6 mb-5 scroll-mt-6">
+        <div class="flex items-center gap-3 mb-1">
+          <span class="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
+            <svg viewBox="0 0 24 24" class="w-5 h-5" fill="currentColor"><path d="M12 4.5C7 4.5 2.7 7.6 1 12c1.7 4.4 6 7.5 11 7.5S21.3 16.4 23 12c-1.7-4.4-6-7.5-11-7.5zm0 12.5a5 5 0 110-10 5 5 0 010 10zm0-8a3 3 0 100 6 3 3 0 000-6z"/></svg>
+          </span>
+          <h2 class="font-semibold text-slate-800">{{ t('只读账号') }}</h2>
+          <span v-if="viewerEnabled" class="text-xs bg-emerald-50 text-online rounded-full px-2 py-0.5 font-medium">{{ t('已启用') }}</span>
+        </div>
+        <p class="text-sm text-slate-400 mb-4">
+          {{ t('设置一个独立密码，分享给只需要查看的人（如领导、客户）。用该密码登录后只能浏览仪表盘 / IP 地图 / 台账 / 告警 / 报表，所有修改操作均被禁止。') }}
+        </p>
+        <div class="flex flex-wrap gap-3 items-center">
+          <input v-model="viewerPwd" type="password" :placeholder="t('只读密码（至少 6 位）')"
+                 class="border border-slate-200 rounded-xl px-3 py-2 text-sm w-56" />
+          <button @click="saveViewer(false)" :disabled="viewerBusy || viewerPwd.length < 6"
+                  class="bg-brand-600 text-white rounded-xl px-4 py-2 text-sm font-medium hover:bg-brand-700 active:scale-95 disabled:opacity-50 transition">
+            {{ viewerEnabled ? t('重置密码') : t('启用') }}
+          </button>
+          <button v-if="viewerEnabled" @click="saveViewer(true)" :disabled="viewerBusy"
+                  class="border border-red-200 text-conflict rounded-xl px-4 py-2 text-sm font-medium hover:bg-red-50 active:scale-95 disabled:opacity-50 transition">
+            {{ t('停用') }}
+          </button>
+        </div>
+        <p v-if="viewerMsg" class="text-xs mt-2 text-slate-500">{{ viewerMsg }}</p>
+      </section>
+
+      <!-- ========== 数据备份 ========== -->
+      <section id="sec-backup" class="bg-white rounded-2xl shadow-card border border-slate-100 p-6 mb-5 scroll-mt-6">
+        <div class="flex items-center gap-3 mb-1">
+          <span class="w-9 h-9 rounded-xl bg-emerald-50 text-online flex items-center justify-center shrink-0">
+            <svg viewBox="0 0 24 24" class="w-5 h-5" fill="currentColor"><path d="M12 3a5 5 0 015 5v1a4 4 0 010 8H7a5 5 0 01-.9-9.9A5 5 0 0112 3zm-1 6v5.6l-2.3-2.3-1.4 1.4 4.7 4.7 4.7-4.7-1.4-1.4-2.3 2.3V9h-2z"/></svg>
+          </span>
+          <h2 class="font-semibold text-slate-800">{{ t('备份与恢复') }}</h2>
+        </div>
+        <p class="text-sm text-slate-400 mb-4">{{ t('备份包含全部子网、台账、告警与系统配置（含管理员密码）。低成本硬件 SD 卡易损坏，建议定期导出。') }}</p>
+        <div class="flex flex-wrap gap-3 items-center">
+          <button @click="doExport" :disabled="exporting"
+                  class="bg-brand-600 text-white rounded-xl px-5 py-2 text-sm font-medium hover:bg-brand-700 active:scale-95 disabled:opacity-50 transition shadow-sm shadow-brand-600/30">
+            {{ exporting ? t('导出中…') : t('导出备份') }}
+          </button>
+          <label class="border border-slate-200 rounded-xl px-5 py-2 text-sm text-slate-600 hover:border-brand-400 hover:text-brand-600 active:scale-95 cursor-pointer transition">
+            {{ t('导入备份…') }}
+            <input type="file" accept=".db" class="hidden" @change="pickImport" />
+          </label>
+        </div>
+
+        <!-- 导入确认 -->
+        <div v-if="pendingImport" class="mt-4 bg-amber-50 border border-amber-200 rounded-xl p-4 animate-fade-in">
+          <p class="text-sm text-amber-700 font-medium mb-1">{{ t('⚠ 确认用「{name}」覆盖当前全部数据？', { name: pendingImport.name }) }}</p>
+          <p class="text-xs text-amber-600 mb-3">{{ t('当前所有子网、台账、告警与配置将被备份文件替换（含管理员密码），此操作不可撤销。') }}</p>
+          <div class="flex gap-3">
+            <button @click="doImport" :disabled="importBusy"
+                    class="bg-amber-600 text-white rounded-xl px-4 py-1.5 text-sm font-medium hover:opacity-90 active:scale-95 disabled:opacity-50 transition">
+              {{ importBusy ? t('恢复中…') : t('确认恢复') }}
+            </button>
+            <button @click="pendingImport = null" class="border border-slate-200 bg-white rounded-xl px-4 py-1.5 text-sm text-slate-500 hover:bg-slate-50 transition">{{ t('取消') }}</button>
+          </div>
+        </div>
+        <p v-if="backupMsg" class="text-sm mt-3 text-slate-500 break-all">{{ backupMsg }}</p>
+      </section>
+
+      <!-- ========== AI 助手 ========== -->
+      <section id="sec-ai" class="bg-white rounded-2xl shadow-card border border-slate-100 p-6 mb-5 scroll-mt-6">
+        <div class="flex items-center gap-3 mb-1">
+          <span class="w-9 h-9 rounded-xl bg-gradient-to-br from-brand-500 to-reserved text-white flex items-center justify-center shrink-0">✨</span>
+          <h2 class="font-semibold text-slate-800">{{ t('AI 助手') }}</h2>
+        </div>
+        <p class="text-sm text-slate-400 mb-5">
+          {{ t('填写 OpenAI 兼容接口（如 DeepSeek、本地 Ollama）。') }}
+          <span class="font-mono text-slate-500">https://api.deepseek.com/v1</span> ·
+          <span class="font-mono text-slate-500">http://127.0.0.1:11434/v1</span>
+        </p>
+        <div class="grid sm:grid-cols-2 gap-3 mb-3">
+          <label class="block text-sm font-medium text-slate-600">Base URL
+            <input v-model="baseURL" class="border border-slate-200 rounded-xl w-full px-3 py-2 mt-1.5 font-mono font-normal" placeholder="https://api.deepseek.com/v1" /></label>
+          <label class="block text-sm font-medium text-slate-600">{{ t('模型名') }}
+            <input v-model="model" class="border border-slate-200 rounded-xl w-full px-3 py-2 mt-1.5 font-mono font-normal" placeholder="deepseek-chat / qwen2.5:3b" /></label>
+        </div>
+        <label class="block text-sm font-medium text-slate-600 mb-5 max-w-sm">API Key
+          <input v-model="apiKey" type="password" class="border border-slate-200 rounded-xl w-full px-3 py-2 mt-1.5 font-mono font-normal" :placeholder="t('本地 Ollama 可留空')" /></label>
+        <div class="flex gap-3">
+          <button @click="save" class="bg-brand-600 text-white rounded-xl px-5 py-2 text-sm font-medium hover:bg-brand-700 active:scale-95 transition shadow-sm shadow-brand-600/30">{{ t('保存') }}</button>
+          <button @click="test" :disabled="testing"
+                  class="border border-slate-200 rounded-xl px-5 py-2 text-sm text-slate-600 hover:border-brand-400 hover:text-brand-600 disabled:opacity-50 active:scale-95 transition flex items-center gap-2">
+            <svg v-if="testing" class="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-opacity=".25" stroke-width="3"/><path d="M21 12a9 9 0 00-9-9" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>
+            {{ testing ? t('测试中…') : t('测试连通') }}
+          </button>
+        </div>
+        <p v-if="msg" class="text-sm mt-4 bg-slate-50 rounded-xl px-3 py-2 break-all">{{ msg }}</p>
+      </section>
+
+      <!-- ========== 系统升级（OTA） ========== -->
+      <section id="sec-update" class="bg-white rounded-2xl shadow-card border border-slate-100 p-6 mb-5 scroll-mt-6">
+        <div class="flex items-center gap-3">
+          <span class="w-9 h-9 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center shrink-0">
+            <svg viewBox="0 0 24 24" class="w-5 h-5" fill="currentColor"><path d="M12 3l4 4h-3v6h-2V7H8l4-4zM5 19h14a1 1 0 011 1v1H4v-1a1 1 0 011-1z" transform="rotate(180 12 12)"/><path d="M12 21a9 9 0 110-18 9 9 0 010 18zm0-2a7 7 0 100-14 7 7 0 000 14z" opacity="0"/></svg>
+          </span>
+          <div>
+            <h2 class="font-semibold text-slate-800">{{ t('系统升级') }}</h2>
+            <p class="text-xs text-slate-400">{{ t('当前版本') }} <span class="font-mono">{{ appVersion || '…' }}</span> · {{ t('升级不中断数据，完成后自动重启') }}</p>
+          </div>
+          <button @click="checkUpdate" :disabled="checkingUpdate"
+                  class="ml-auto border border-slate-200 rounded-xl px-4 py-2 text-sm text-slate-600 hover:border-brand-400 hover:text-brand-600 active:scale-95 disabled:opacity-50 transition shrink-0">
+            {{ checkingUpdate ? t('检查中…') : t('检查更新') }}
+          </button>
+        </div>
+        <div v-if="updateInfo?.has_update" class="mt-3 bg-brand-50 border border-brand-100 rounded-xl px-4 py-3 flex items-center gap-3">
+          <div class="flex-1 min-w-0">
+            <p class="text-sm font-medium text-slate-800">{{ t('发现新版本') }} <span class="font-mono text-brand-600">{{ updateInfo.latest }}</span></p>
+            <p v-if="updateInfo.notes" class="text-xs text-slate-500 mt-0.5 whitespace-pre-line">{{ updateInfo.notes }}</p>
+          </div>
+          <button v-if="!confirmUpgrade" @click="confirmUpgrade = true" :disabled="applying"
+                  class="bg-brand-600 text-white rounded-xl px-4 py-2 text-sm font-medium hover:bg-brand-700 active:scale-95 disabled:opacity-50 transition shrink-0">
+            {{ t('立即升级') }}
+          </button>
+          <div v-else class="flex gap-2 shrink-0">
+            <button @click="applyUpdate" :disabled="applying"
+                    class="bg-conflict text-white rounded-xl px-4 py-2 text-sm font-medium hover:bg-red-600 active:scale-95 disabled:opacity-50 transition">
+              {{ applying ? t('升级中…') : t('确认升级') }}
+            </button>
+            <button @click="confirmUpgrade = false" class="border border-slate-200 rounded-xl px-4 py-2 text-sm text-slate-600">{{ t('取消') }}</button>
+          </div>
+        </div>
+        <p v-if="updateMsg" class="text-xs mt-3 text-slate-500 break-all">{{ updateMsg }}</p>
+      </section>
+
+      <!-- ========== 危险区：重新初始化 ========== -->
+      <section id="sec-danger" class="bg-white rounded-2xl shadow-card p-6 border border-red-200 scroll-mt-6">
+        <h2 class="font-semibold text-conflict mb-1">{{ t('重新初始化') }}</h2>
+        <p class="text-sm text-slate-400 mb-4">
+          {{ t('重新运行初始化向导（可重新选择本机网卡自动组网）。AI 助手配置会保留。') }}
+        </p>
+
+        <button v-if="!confirmReset" @click="confirmReset = true"
+                class="border border-red-300 text-conflict rounded-xl px-4 py-2 text-sm font-medium hover:bg-red-50 active:scale-95 transition">
+          {{ t('重新运行初始化向导…') }}
+        </button>
+
+        <div v-else class="bg-red-50 rounded-xl p-4 animate-fade-in">
+          <template v-if="overview && (overview.subnets > 0 || overview.stats.total > 0)">
+            <p class="text-sm text-conflict font-medium mb-2">{{ t('⚠ 当前已有数据：') }}</p>
+            <ul class="text-sm text-slate-600 mb-3 list-disc list-inside space-y-0.5">
+              <li>{{ t('{n} 个受管子网', { n: overview.subnets }) }}</li>
+              <li>{{ t('{n} 条 IP 观测/标注记录', { n: overview.stats.total }) }}</li>
+              <li>{{ t('{n} 条未读告警', { n: overview.unread_alerts }) }}</li>
+            </ul>
+            <p class="text-sm text-conflict mb-4">{{ t('进入初始化前必须清除以上数据，此操作不可恢复。确定要继续吗？') }}</p>
           </template>
-          <span v-if="!owners.length" class="text-xs text-slate-300">{{ t('暂无，请在下方添加') }}</span>
+          <p v-else class="text-sm text-slate-600 mb-4">{{ t('当前没有业务数据，可以安全地重新初始化。') }}</p>
+          <div class="flex gap-3">
+            <button @click="doReset" :disabled="resetting"
+                    class="bg-conflict text-white rounded-xl px-4 py-2 text-sm font-medium hover:opacity-90 active:scale-95 disabled:opacity-50 transition">
+              {{ resetting ? t('正在清除…') : t('确认清除并进入初始化') }}
+            </button>
+            <button @click="confirmReset = false" class="border border-slate-200 bg-white rounded-xl px-4 py-2 text-sm text-slate-500 hover:bg-slate-50 transition">{{ t('取消') }}</button>
+          </div>
+          <p v-if="resetMsg" class="text-sm mt-3">{{ resetMsg }}</p>
         </div>
-        <div class="flex gap-2">
-          <input v-model="newOwner" @keyup.enter="addItem('owners', newOwner)" :placeholder="t('新负责人，回车添加')"
-                 class="border border-slate-200 rounded-xl flex-1 px-3 py-1.5 text-sm" />
-          <button @click="addItem('owners', newOwner)" class="border border-slate-200 rounded-xl px-3 text-sm text-slate-500 hover:border-brand-400 hover:text-brand-600 transition">{{ t('添加') }}</button>
-        </div>
-        <p class="text-xs text-slate-400 mt-2">{{ t('点击标签可重命名（台账引用会同步更新）；增删即时生效。') }}</p>
       </section>
     </div>
-    <p v-if="dictMsg" class="text-xs text-slate-500 mb-5 -mt-3">{{ dictMsg }}</p>
-
-    <!-- 只读账号 -->
-    <section class="bg-white rounded-2xl shadow-card border border-slate-100 p-6 mb-5">
-      <div class="flex items-center gap-3 mb-1">
-        <span class="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
-          <svg viewBox="0 0 24 24" class="w-5 h-5" fill="currentColor"><path d="M12 4.5C7 4.5 2.7 7.6 1 12c1.7 4.4 6 7.5 11 7.5S21.3 16.4 23 12c-1.7-4.4-6-7.5-11-7.5zm0 12.5a5 5 0 110-10 5 5 0 010 10zm0-8a3 3 0 100 6 3 3 0 000-6z"/></svg>
-        </span>
-        <h2 class="font-semibold text-slate-800">{{ t('只读账号') }}</h2>
-        <span v-if="viewerEnabled" class="text-xs bg-emerald-50 text-online rounded-full px-2 py-0.5 font-medium">{{ t('已启用') }}</span>
-      </div>
-      <p class="text-sm text-slate-400 mb-4">
-        {{ t('设置一个独立密码，分享给只需要查看的人（如领导、客户）。用该密码登录后只能浏览仪表盘 / IP 地图 / 台账 / 告警 / 报表，所有修改操作均被禁止。') }}
-      </p>
-      <div class="flex flex-wrap gap-3 items-center">
-        <input v-model="viewerPwd" type="password" :placeholder="t('只读密码（至少 6 位）')"
-               class="border border-slate-200 rounded-xl px-3 py-2 text-sm w-56" />
-        <button @click="saveViewer(false)" :disabled="viewerBusy || viewerPwd.length < 6"
-                class="bg-brand-600 text-white rounded-xl px-4 py-2 text-sm font-medium hover:bg-brand-700 active:scale-95 disabled:opacity-50 transition">
-          {{ viewerEnabled ? t('重置密码') : t('启用') }}
-        </button>
-        <button v-if="viewerEnabled" @click="saveViewer(true)" :disabled="viewerBusy"
-                class="border border-red-200 text-conflict rounded-xl px-4 py-2 text-sm font-medium hover:bg-red-50 active:scale-95 disabled:opacity-50 transition">
-          {{ t('停用') }}
-        </button>
-      </div>
-      <p v-if="viewerMsg" class="text-xs mt-2 text-slate-500">{{ viewerMsg }}</p>
-    </section>
-
-    <!-- 备份与恢复 -->
-    <section class="bg-white rounded-2xl shadow-card border border-slate-100 p-6 mb-5">
-      <div class="flex items-center gap-3 mb-1">
-        <span class="w-9 h-9 rounded-xl bg-emerald-50 text-online flex items-center justify-center">
-          <svg viewBox="0 0 24 24" class="w-5 h-5" fill="currentColor"><path d="M12 3a5 5 0 015 5v1a4 4 0 010 8H7a5 5 0 01-.9-9.9A5 5 0 0112 3zm-1 6v5.6l-2.3-2.3-1.4 1.4 4.7 4.7 4.7-4.7-1.4-1.4-2.3 2.3V9h-2z"/></svg>
-        </span>
-        <h2 class="font-semibold text-slate-800">{{ t('备份与恢复') }}</h2>
-      </div>
-      <p class="text-sm text-slate-400 mb-4">{{ t('备份包含全部子网、台账、告警与系统配置（含管理员密码）。低成本硬件 SD 卡易损坏，建议定期导出。') }}</p>
-      <div class="flex flex-wrap gap-3 items-center">
-        <button @click="doExport" :disabled="exporting"
-                class="bg-brand-600 text-white rounded-xl px-5 py-2 text-sm font-medium hover:bg-brand-700 active:scale-95 disabled:opacity-50 transition shadow-sm shadow-brand-600/30">
-          {{ exporting ? t('导出中…') : t('导出备份') }}
-        </button>
-        <label class="border border-slate-200 rounded-xl px-5 py-2 text-sm text-slate-600 hover:border-brand-400 hover:text-brand-600 active:scale-95 cursor-pointer transition">
-          {{ t('导入备份…') }}
-          <input type="file" accept=".db" class="hidden" @change="pickImport" />
-        </label>
-      </div>
-
-      <!-- 导入确认 -->
-      <div v-if="pendingImport" class="mt-4 bg-amber-50 border border-amber-200 rounded-xl p-4 animate-fade-in">
-        <p class="text-sm text-amber-700 font-medium mb-1">{{ t('⚠ 确认用「{name}」覆盖当前全部数据？', { name: pendingImport.name }) }}</p>
-        <p class="text-xs text-amber-600 mb-3">{{ t('当前所有子网、台账、告警与配置将被备份文件替换（含管理员密码），此操作不可撤销。') }}</p>
-        <div class="flex gap-3">
-          <button @click="doImport" :disabled="importBusy"
-                  class="bg-amber-600 text-white rounded-xl px-4 py-1.5 text-sm font-medium hover:opacity-90 active:scale-95 disabled:opacity-50 transition">
-            {{ importBusy ? t('恢复中…') : t('确认恢复') }}
-          </button>
-          <button @click="pendingImport = null" class="border border-slate-200 bg-white rounded-xl px-4 py-1.5 text-sm text-slate-500 hover:bg-slate-50 transition">{{ t('取消') }}</button>
-        </div>
-      </div>
-      <p v-if="backupMsg" class="text-sm mt-3 text-slate-500 break-all">{{ backupMsg }}</p>
-    </section>
-
-    <section class="bg-white rounded-2xl shadow-card border border-slate-100 p-6 mb-5">
-      <div class="flex items-center gap-3 mb-1">
-        <span class="w-9 h-9 rounded-xl bg-gradient-to-br from-brand-500 to-reserved text-white flex items-center justify-center">✨</span>
-        <h2 class="font-semibold text-slate-800">{{ t('AI 助手') }}</h2>
-      </div>
-      <p class="text-sm text-slate-400 mb-5">
-        {{ t('填写 OpenAI 兼容接口（如 DeepSeek、本地 Ollama）。') }}
-        <span class="font-mono text-slate-500">https://api.deepseek.com/v1</span> ·
-        <span class="font-mono text-slate-500">http://127.0.0.1:11434/v1</span>
-      </p>
-      <label class="block text-sm font-medium text-slate-600 mb-3">Base URL
-        <input v-model="baseURL" class="border border-slate-200 rounded-xl w-full px-3 py-2 mt-1.5 font-mono font-normal" placeholder="https://api.deepseek.com/v1" /></label>
-      <label class="block text-sm font-medium text-slate-600 mb-3">{{ t('模型名') }}
-        <input v-model="model" class="border border-slate-200 rounded-xl w-full px-3 py-2 mt-1.5 font-mono font-normal" placeholder="deepseek-chat / qwen2.5:3b" /></label>
-      <label class="block text-sm font-medium text-slate-600 mb-5">API Key
-        <input v-model="apiKey" type="password" class="border border-slate-200 rounded-xl w-full px-3 py-2 mt-1.5 font-mono font-normal" :placeholder="t('本地 Ollama 可留空')" /></label>
-      <div class="flex gap-3">
-        <button @click="save" class="bg-brand-600 text-white rounded-xl px-5 py-2 text-sm font-medium hover:bg-brand-700 active:scale-95 transition shadow-sm shadow-brand-600/30">{{ t('保存') }}</button>
-        <button @click="test" :disabled="testing"
-                class="border border-slate-200 rounded-xl px-5 py-2 text-sm text-slate-600 hover:border-brand-400 hover:text-brand-600 disabled:opacity-50 active:scale-95 transition flex items-center gap-2">
-          <svg v-if="testing" class="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-opacity=".25" stroke-width="3"/><path d="M21 12a9 9 0 00-9-9" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>
-          {{ testing ? t('测试中…') : t('测试连通') }}
-        </button>
-      </div>
-      <p v-if="msg" class="text-sm mt-4 bg-slate-50 rounded-xl px-3 py-2 break-all">{{ msg }}</p>
-    </section>
-
-    <!-- 系统升级（OTA） -->
-    <section class="bg-white rounded-2xl shadow-card border border-slate-100 p-6 mb-5">
-      <div class="flex items-center gap-3 mb-3">
-        <span class="w-9 h-9 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center">
-          <svg viewBox="0 0 24 24" class="w-5 h-5" fill="currentColor"><path d="M12 3l4 4h-3v6h-2V7H8l4-4zM5 19h14a1 1 0 011 1v1H4v-1a1 1 0 011-1z" transform="rotate(180 12 12)"/><path d="M12 21a9 9 0 110-18 9 9 0 010 18zm0-2a7 7 0 100-14 7 7 0 000 14z" opacity="0"/></svg>
-        </span>
-        <div>
-          <h2 class="font-semibold text-slate-800">{{ t('系统升级') }}</h2>
-          <p class="text-xs text-slate-400">{{ t('当前版本') }} <span class="font-mono">{{ appVersion || '…' }}</span> · {{ t('升级不中断数据，完成后自动重启') }}</p>
-        </div>
-        <button @click="checkUpdate" :disabled="checkingUpdate"
-                class="ml-auto border border-slate-200 rounded-xl px-4 py-2 text-sm text-slate-600 hover:border-brand-400 hover:text-brand-600 active:scale-95 disabled:opacity-50 transition">
-          {{ checkingUpdate ? t('检查中…') : t('检查更新') }}
-        </button>
-      </div>
-      <div v-if="updateInfo?.has_update" class="bg-brand-50 border border-brand-100 rounded-xl px-4 py-3 flex items-center gap-3">
-        <div class="flex-1 min-w-0">
-          <p class="text-sm font-medium text-slate-800">{{ t('发现新版本') }} <span class="font-mono text-brand-600">{{ updateInfo.latest }}</span></p>
-          <p v-if="updateInfo.notes" class="text-xs text-slate-500 mt-0.5 whitespace-pre-line">{{ updateInfo.notes }}</p>
-        </div>
-        <button v-if="!confirmUpgrade" @click="confirmUpgrade = true" :disabled="applying"
-                class="bg-brand-600 text-white rounded-xl px-4 py-2 text-sm font-medium hover:bg-brand-700 active:scale-95 disabled:opacity-50 transition shrink-0">
-          {{ t('立即升级') }}
-        </button>
-        <div v-else class="flex gap-2 shrink-0">
-          <button @click="applyUpdate" :disabled="applying"
-                  class="bg-conflict text-white rounded-xl px-4 py-2 text-sm font-medium hover:bg-red-600 active:scale-95 disabled:opacity-50 transition">
-            {{ applying ? t('升级中…') : t('确认升级') }}
-          </button>
-          <button @click="confirmUpgrade = false" class="border border-slate-200 rounded-xl px-4 py-2 text-sm text-slate-600">{{ t('取消') }}</button>
-        </div>
-      </div>
-      <p v-if="updateMsg" class="text-xs mt-3 text-slate-500 break-all">{{ updateMsg }}</p>
-    </section>
-
-    <!-- 重新初始化（危险区） -->
-    <section class="bg-white rounded-2xl shadow-card p-6 border border-red-200">
-      <h2 class="font-semibold text-conflict mb-1">{{ t('重新初始化') }}</h2>
-      <p class="text-sm text-slate-400 mb-4">
-        {{ t('重新运行初始化向导（可重新选择本机网卡自动组网）。AI 助手配置会保留。') }}
-      </p>
-
-      <button v-if="!confirmReset" @click="confirmReset = true"
-              class="border border-red-300 text-conflict rounded-xl px-4 py-2 text-sm font-medium hover:bg-red-50 active:scale-95 transition">
-        {{ t('重新运行初始化向导…') }}
-      </button>
-
-      <div v-else class="bg-red-50 rounded-xl p-4 animate-fade-in">
-        <template v-if="overview && (overview.subnets > 0 || overview.stats.total > 0)">
-          <p class="text-sm text-conflict font-medium mb-2">{{ t('⚠ 当前已有数据：') }}</p>
-          <ul class="text-sm text-slate-600 mb-3 list-disc list-inside space-y-0.5">
-            <li>{{ t('{n} 个受管子网', { n: overview.subnets }) }}</li>
-            <li>{{ t('{n} 条 IP 观测/标注记录', { n: overview.stats.total }) }}</li>
-            <li>{{ t('{n} 条未读告警', { n: overview.unread_alerts }) }}</li>
-          </ul>
-          <p class="text-sm text-conflict mb-4">{{ t('进入初始化前必须清除以上数据，此操作不可恢复。确定要继续吗？') }}</p>
-        </template>
-        <p v-else class="text-sm text-slate-600 mb-4">{{ t('当前没有业务数据，可以安全地重新初始化。') }}</p>
-        <div class="flex gap-3">
-          <button @click="doReset" :disabled="resetting"
-                  class="bg-conflict text-white rounded-xl px-4 py-2 text-sm font-medium hover:opacity-90 active:scale-95 disabled:opacity-50 transition">
-            {{ resetting ? t('正在清除…') : t('确认清除并进入初始化') }}
-          </button>
-          <button @click="confirmReset = false" class="border border-slate-200 bg-white rounded-xl px-4 py-2 text-sm text-slate-500 hover:bg-slate-50 transition">{{ t('取消') }}</button>
-        </div>
-        <p v-if="resetMsg" class="text-sm mt-3">{{ resetMsg }}</p>
-      </div>
-    </section>
   </div>
 </template>

@@ -3,7 +3,6 @@ package api
 
 import (
 	"net/http"
-	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -18,7 +17,9 @@ func NewRouter(db *store.Store, engine *scanner.Engine, mon *uplink.Monitor) htt
 	auth := newAuthManager(db)
 
 	r := chi.NewRouter()
-	r.Use(middleware.Logger, middleware.Recoverer, middleware.Timeout(30*time.Second))
+	// 注意：不用全局 middleware.Timeout —— AI 对话可能超过 30s，
+	// 长耗时接口（AI/OTA 下载）自带超时控制；普通 API 都很轻。
+	r.Use(middleware.Logger, middleware.Recoverer)
 
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Use(auth.middleware)

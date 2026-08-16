@@ -17,8 +17,10 @@ async function login() {
     token.set(tk)
     role.set(r)
     router.push('/dashboard')
-  } catch {
-    error.value = t('login.err')
+  } catch (e: any) {
+    // 优先展示后端给出的具体原因（如登录锁定），兜底为「密码错误」
+    const m = String(e?.message || '')
+    error.value = (m && m !== 'unauthorized' && !m.startsWith('{')) ? m : t('login.err')
   }
 }
 </script>

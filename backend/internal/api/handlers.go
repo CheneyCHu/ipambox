@@ -91,14 +91,22 @@ func (h *handlers) ListSubnets(w http.ResponseWriter, r *http.Request) {
 
 func (h *handlers) CreateSubnet(w http.ResponseWriter, r *http.Request) {
 	var sub models.Subnet
-	if err := json.NewDecoder(r.Body).Decode(&sub); err != nil {
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 64<<10)).Decode(&sub); err != nil {
 		writeErr(w, 400, err)
 		return
 	}
-	if sub.CIDR == "" {
-		writeErr(w, 400, errString("cidr 不能为空"))
+	// 校验 CIDR 格式且限 IPv4（扫描引擎仅支持 IPv4）
+	ip, ipnet, err := net.ParseCIDR(strings.TrimSpace(sub.CIDR))
+	if err != nil || ip == nil || ip.To4() == nil {
+		writeErr(w, 400, errString("CIDR 格式不合法（仅支持 IPv4，如 192.168.1.0/24）"))
 		return
 	}
+	ones, _ := ipnet.Mask.Size()
+	if ones < 8 || ones > 30 {
+		writeErr(w, 400, errString("前缀长度须在 /8 ~ /30 之间"))
+		return
+	}
+	sub.CIDR = ipnet.String() // 规范化为网络地址
 	if err := h.db.CreateSubnet(&sub); err != nil {
 		writeErr(w, 500, err)
 		return
@@ -278,6 +286,12 @@ func (h *handlers) GetSettings(w http.ResponseWriter, r *http.Request) {
 		}
 		out[k] = v
 	}
+	// 只读账号不返回敏感项（Webhook 地址 / 加签密钥）
+	if roleFrom(r) == "viewer" {
+		delete(out, "notify_webhook")
+		delete(out, "notify_secret")
+		delete(out, "update_manifest_url")
+	}
 	writeJSON(w, 200, out)
 }
 
@@ -424,8 +438,12 @@ func (h *handlers) AIChat(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Message string `json:"message"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Message == "" {
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 256<<10)).Decode(&body); err != nil || body.Message == "" {
 		writeErr(w, 400, errString("message 不能为空"))
+		return
+	}
+	if len([]rune(body.Message)) > 2000 {
+		writeErr(w, 400, errString("消息过长（上限 2000 字）"))
 		return
 	}
 	baseURL, _ := h.db.GetSetting("ai_base_url")

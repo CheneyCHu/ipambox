@@ -1,13 +1,17 @@
 package api
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"net"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/ipambox/ipambox/internal/store"
 )
@@ -20,10 +24,56 @@ type authManager struct {
 	db     *store.Store
 	mu     sync.Mutex
 	tokens map[string]string // token -> role
+
+	// 登录爆破防护：按客户端 IP 记录连续失败次数与锁定截止时间
+	failMu   sync.Mutex
+	fails    map[string]int
+	lockedTo map[string]time.Time
 }
 
 func newAuthManager(db *store.Store) *authManager {
-	return &authManager{db: db, tokens: map[string]string{}}
+	return &authManager{db: db, tokens: map[string]string{}, fails: map[string]int{}, lockedTo: map[string]time.Time{}}
+}
+
+// loginThrottle 登录频率限制：连续失败 5 次锁定 60 秒，之后每次失败翻倍（上限 15 分钟）。
+func (a *authManager) loginThrottle(ip string) (locked bool, retryAfter int) {
+	a.failMu.Lock()
+	defer a.failMu.Unlock()
+	if until, ok := a.lockedTo[ip]; ok {
+		if d := time.Until(until); d > 0 {
+			return true, int(d.Seconds()) + 1
+		}
+		delete(a.lockedTo, ip)
+	}
+	return false, 0
+}
+
+func (a *authManager) loginFailed(ip string) {
+	a.failMu.Lock()
+	defer a.failMu.Unlock()
+	a.fails[ip]++
+	if n := a.fails[ip]; n >= 5 {
+		// 锁定 60s << (n-5) 次方级数，封顶 15min
+		d := 60 << min(n-5, 4)
+		if d > 900 {
+			d = 900
+		}
+		a.lockedTo[ip] = time.Now().Add(time.Duration(d) * time.Second)
+	}
+}
+
+func (a *authManager) loginSucceeded(ip string) {
+	a.failMu.Lock()
+	defer a.failMu.Unlock()
+	delete(a.fails, ip)
+	delete(a.lockedTo, ip)
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
 
 func (a *authManager) initialized() bool {
@@ -78,8 +128,19 @@ func (a *authManager) middleware(next http.Handler) http.Handler {
 			writeJSON(w, http.StatusForbidden, map[string]string{"error": "只读账号无此操作权限"})
 			return
 		}
-		next.ServeHTTP(w, r)
+		// 角色写入上下文，供 handler 做差异化输出（如对 viewer 隐藏敏感配置）
+		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), roleCtxKey, role)))
 	})
+}
+
+type ctxKey int
+
+const roleCtxKey ctxKey = iota
+
+// roleFrom 取当前请求角色（中间件已保证非空）。
+func roleFrom(r *http.Request) string {
+	v, _ := r.Context().Value(roleCtxKey).(string)
+	return v
 }
 
 // SetupStatus 返回是否已初始化。
@@ -108,22 +169,35 @@ func (a *authManager) SetupInit(w http.ResponseWriter, r *http.Request) {
 }
 
 // Login 校验密码并返回 token。管理员密码 → admin；只读密码（若已设置）→ viewer。
+// 带爆破防护：同一 IP 连续失败 5 次后锁定（60 秒起，逐级翻倍，封顶 15 分钟）。
 func (a *authManager) Login(w http.ResponseWriter, r *http.Request) {
+	ip, _, _ := net.SplitHostPort(r.RemoteAddr)
+	if ip == "" {
+		ip = r.RemoteAddr
+	}
+	if locked, wait := a.loginThrottle(ip); locked {
+		w.Header().Set("Retry-After", strconv.Itoa(wait))
+		writeErr(w, http.StatusTooManyRequests, errString("尝试次数过多，请稍后再试"))
+		return
+	}
 	var body struct {
 		Password string `json:"password"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4<<10)).Decode(&body); err != nil {
 		writeErr(w, 400, err)
 		return
 	}
 	if stored, _ := a.db.GetSetting("password_hash"); stored != "" && stored == hashPassword(body.Password) {
+		a.loginSucceeded(ip)
 		writeJSON(w, 200, map[string]string{"token": a.issueToken("admin"), "role": "admin"})
 		return
 	}
 	if vh, _ := a.db.GetSetting("viewer_password_hash"); vh != "" && vh == hashPassword(body.Password) {
+		a.loginSucceeded(ip)
 		writeJSON(w, 200, map[string]string{"token": a.issueToken("viewer"), "role": "viewer"})
 		return
 	}
+	a.loginFailed(ip)
 	writeErr(w, 401, errString("密码错误"))
 }
 
