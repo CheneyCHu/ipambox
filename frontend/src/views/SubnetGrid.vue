@@ -2,6 +2,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { api, isViewer, type IPAddress, type Subnet, type NICInfo } from '../api'
+import { t } from '../i18n'
 import DictSelect from '../components/DictSelect.vue'
 
 const route = useRoute()
@@ -35,9 +36,10 @@ const colors: Record<string, string> = {
   free: 'bg-white border border-slate-200',
   conflict: 'bg-conflict animate-pulse', reserved: 'bg-reserved', rogue: 'bg-rogue',
 }
-const statusText: Record<string, string> = {
+const statusKeys: Record<string, string> = {
   online: '在线', offline: '离线', free: '闲置', conflict: '冲突', reserved: '保留', rogue: '未授权',
 }
+const statusText = (s: string) => t(statusKeys[s] || s)
 
 // fmtTime 把 ISO 时间（2026-08-11T12:36:24Z）格式化为本地可读时间
 function fmtTime(v?: string): string {
@@ -47,14 +49,14 @@ function fmtTime(v?: string): string {
   const p = (n: number) => String(n).padStart(2, '0')
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`
 }
-const legend = [
-  { key: 'online', label: '在线', dot: 'bg-online' },
-  { key: 'offline', label: '离线', dot: 'bg-offline' },
-  { key: 'free', label: '闲置', dot: 'bg-white border border-slate-300' },
-  { key: 'conflict', label: '冲突', dot: 'bg-conflict' },
-  { key: 'reserved', label: '保留', dot: 'bg-reserved' },
-  { key: 'rogue', label: '未授权', dot: 'bg-rogue' },
-]
+const legend = computed(() => [
+  { key: 'online', label: t('在线'), dot: 'bg-online' },
+  { key: 'offline', label: t('离线'), dot: 'bg-offline' },
+  { key: 'free', label: t('闲置'), dot: 'bg-white border border-slate-300' },
+  { key: 'conflict', label: t('冲突'), dot: 'bg-conflict' },
+  { key: 'reserved', label: t('保留'), dot: 'bg-reserved' },
+  { key: 'rogue', label: t('未授权'), dot: 'bg-rogue' },
+])
 
 const subnetId = computed(() => Number(route.params.id || subnets.value[0]?.id || 0))
 const currentSubnet = computed(() => subnets.value.find(s => s.id === subnetId.value))
@@ -105,17 +107,17 @@ async function load() {
 async function scan() {
   error.value = ''; notice.value = ''
   if (!subnetId.value) {
-    error.value = '请先添加一个子网，再开始扫描'
+    error.value = t('请先添加一个子网，再开始扫描')
     showAdd.value = true
     return
   }
   scanning.value = true
-  notice.value = '扫描已启动，正在发现设备…'
+  notice.value = t('扫描已启动，正在发现设备…')
   try {
     await api.scanNow(subnetId.value)
   } catch (e: any) {
     scanning.value = false
-    error.value = '扫描启动失败：' + e.message + '（请确认后端服务已启动）'
+    error.value = t('扫描启动失败：') + e.message + t('（请确认后端服务已启动）')
     return
   }
   let n = 0
@@ -124,7 +126,7 @@ async function scan() {
     if (++n >= 10) {
       scanning.value = false
       poller && clearInterval(poller)
-      notice.value = `扫描完成，发现 ${addresses.value.filter(a => a.status === 'online').length} 台在线设备`
+      notice.value = t('扫描完成，发现 {n} 台在线设备', { n: addresses.value.filter(a => a.status === 'online').length })
       setTimeout(() => (notice.value = ''), 5000)
     }
   }, 2000)
@@ -132,7 +134,7 @@ async function scan() {
 
 async function addSubnet() {
   error.value = ''
-  if (!newCIDR.value.includes('/')) { error.value = '请输入 CIDR 格式，如 192.168.1.0/24'; return }
+  if (!newCIDR.value.includes('/')) { error.value = t('请输入 CIDR 格式，如 192.168.1.0/24'); return }
   try {
     const sub = await api.createSubnet({ cidr: newCIDR.value, name: newName.value || newCIDR.value, iface: newIface.value })
     subnets.value.push(sub)
@@ -145,7 +147,7 @@ async function addSubnet() {
 function pickNIC(nic: NICInfo) {
   newCIDR.value = nic.cidr
   newIface.value = nic.name
-  if (!newName.value) newName.value = `${nic.name} 网段`
+  if (!newName.value) newName.value = t('{name} 网段', { name: nic.name })
 }
 
 async function save() {
@@ -154,7 +156,7 @@ async function save() {
     await api.annotate(selected.value.id, {
       label: selected.value.label ?? '', owner: selected.value.owner ?? '', dev_type: selected.value.dev_type ?? '',
     })
-    notice.value = '已保存'
+    notice.value = t('已保存')
     setTimeout(() => (notice.value = ''), 2000)
   } catch (e: any) { error.value = e.message }
 }
@@ -177,14 +179,14 @@ onUnmounted(() => poller && clearInterval(poller))
 <template>
   <div class="animate-fade-in">
     <header class="mb-5">
-      <h1 class="text-2xl font-bold text-slate-900 tracking-tight">IP 地图</h1>
-      <p class="text-sm text-slate-400 mt-1">以网格俯瞰网段内每一个地址的状态</p>
+      <h1 class="text-2xl font-bold text-slate-900 tracking-tight">{{ t('IP 地图') }}</h1>
+      <p class="text-sm text-slate-400 mt-1">{{ t('以网格俯瞰网段内每一个地址的状态') }}</p>
     </header>
 
     <!-- 工具栏 -->
     <div class="bg-white rounded-2xl shadow-card border border-slate-100 p-3 mb-4 flex flex-wrap items-center gap-3">
       <label v-if="subnets.length" class="flex items-center gap-2">
-        <span class="text-sm text-slate-400 whitespace-nowrap">选择子网：</span>
+        <span class="text-sm text-slate-400 whitespace-nowrap">{{ t('选择子网：') }}</span>
         <select :value="subnetId"
                 @change="router.push(`/subnets/${($event.target as HTMLSelectElement).value}`)"
                 class="border border-slate-200 rounded-xl px-3 py-2 font-mono text-sm bg-white cursor-pointer hover:border-slate-300">
@@ -193,28 +195,28 @@ onUnmounted(() => poller && clearInterval(poller))
       </label>
       <div class="relative flex-1 max-w-xs">
         <svg viewBox="0 0 24 24" class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" fill="currentColor"><path d="M10 2a8 8 0 105.3 14l4.4 4.3 1.4-1.4-4.3-4.4A8 8 0 0010 2zm0 2a6 6 0 110 12 6 6 0 010-12z"/></svg>
-        <input v-model="filter" placeholder="搜索 IP / 标注 / MAC…"
+        <input v-model="filter" :placeholder="t('搜索 IP / 标注 / MAC…')"
                class="border border-slate-200 rounded-xl pl-9 pr-3 py-2 w-full text-sm" />
       </div>
       <div class="flex bg-slate-100 rounded-xl p-0.5">
         <button @click="viewMode = 'grid'"
                 :class="['px-3 py-1.5 text-xs font-medium rounded-[10px] transition', viewMode === 'grid' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-400 hover:text-slate-600']">
-          ▦ 网格
+          ▦ {{ t('网格') }}
         </button>
         <button @click="viewMode = 'list'"
                 :class="['px-3 py-1.5 text-xs font-medium rounded-[10px] transition', viewMode === 'list' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-400 hover:text-slate-600']">
-          ☰ 列表
+          ☰ {{ t('列表') }}
         </button>
       </div>
       <button v-if="!isViewer()" @click="scan" :disabled="scanning"
               class="ml-auto bg-brand-600 text-white rounded-xl px-5 py-2 text-sm font-medium hover:bg-brand-700 active:scale-95 disabled:opacity-50 disabled:active:scale-100 shadow-sm shadow-brand-600/30 transition flex items-center gap-2">
         <svg v-if="scanning" class="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-opacity=".25" stroke-width="3"/><path d="M21 12a9 9 0 00-9-9" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>
         <span v-else>⚡</span>
-        {{ scanning ? '扫描中…' : '立即扫描' }}
+        {{ scanning ? t('扫描中…') : t('立即扫描') }}
       </button>
       <button v-if="!isViewer()" @click="showAdd = !showAdd"
               class="border border-brand-200 text-brand-600 rounded-xl px-4 py-2 text-sm font-medium hover:bg-brand-50 active:scale-95 transition">
-        + 添加子网
+        + {{ t('添加子网') }}
       </button>
     </div>
 
@@ -222,26 +224,26 @@ onUnmounted(() => poller && clearInterval(poller))
     <div v-if="showAdd" class="bg-brand-50/60 border border-brand-100 rounded-2xl p-4 mb-4 animate-fade-in">
       <!-- 本机物理网卡 -->
       <div v-if="nics.length" class="mb-3">
-        <p class="text-xs text-slate-500 mb-2">本机物理网卡（点选自动填充网段并绑定接入网卡）：</p>
+        <p class="text-xs text-slate-500 mb-2">{{ t('本机物理网卡（点选自动填充网段并绑定接入网卡）：') }}</p>
         <div class="flex flex-wrap gap-2">
           <button v-for="nic in nics" :key="nic.name + nic.ip" @click="pickNIC(nic)"
                   :class="['border rounded-xl px-3 py-2 text-left text-sm transition active:scale-95',
                            newIface === nic.name ? 'border-brand-600 bg-white ring-1 ring-brand-600' : 'border-slate-200 bg-white hover:border-slate-400']">
             <span class="font-mono font-medium">{{ nic.name }}</span>
             <span class="font-mono text-slate-400 ml-2">{{ nic.ip }}/{{ nic.prefix }}</span>
-            <span class="block text-xs text-slate-400">子网 <span class="font-mono text-brand-600">{{ nic.cidr }}</span></span>
+            <span class="block text-xs text-slate-400">{{ t('子网') }} <span class="font-mono text-brand-600">{{ nic.cidr }}</span></span>
           </button>
         </div>
       </div>
       <div class="flex flex-wrap items-center gap-3">
-        <input v-model="newCIDR" placeholder="CIDR，如 192.168.1.0/24" class="border border-slate-200 rounded-xl px-3 py-2 font-mono text-sm w-60 bg-white" />
-        <input v-model="newName" placeholder="名称（可选），如 办公网" class="border border-slate-200 rounded-xl px-3 py-2 text-sm w-52 bg-white" />
+        <input v-model="newCIDR" :placeholder="t('CIDR，如 192.168.1.0/24')" class="border border-slate-200 rounded-xl px-3 py-2 font-mono text-sm w-60 bg-white" />
+        <input v-model="newName" :placeholder="t('名称（可选），如 办公网')" class="border border-slate-200 rounded-xl px-3 py-2 text-sm w-52 bg-white" />
         <select v-model="newIface" class="border border-slate-200 rounded-xl px-3 py-2 text-sm bg-white font-mono">
-          <option value="">接入网卡（可选）</option>
+          <option value="">{{ t('接入网卡（可选）') }}</option>
           <option v-for="nic in nics" :key="nic.name" :value="nic.name">{{ nic.name }}</option>
         </select>
-        <button @click="addSubnet" class="bg-brand-600 text-white rounded-xl px-4 py-2 text-sm font-medium hover:bg-brand-700 active:scale-95 transition">保存</button>
-        <span class="text-sm text-slate-500">添加后点击「立即扫描」即可发现该网段内的设备</span>
+        <button @click="addSubnet" class="bg-brand-600 text-white rounded-xl px-4 py-2 text-sm font-medium hover:bg-brand-700 active:scale-95 transition">{{ t('保存') }}</button>
+        <span class="text-sm text-slate-500">{{ t('添加后点击「立即扫描」即可发现该网段内的设备') }}</span>
       </div>
     </div>
 
@@ -256,21 +258,21 @@ onUnmounted(() => poller && clearInterval(poller))
         <i :class="['w-2.5 h-2.5 rounded-full', l.dot]"></i>{{ l.label }}
       </span>
       <span class="ml-auto text-xs text-slate-400 font-mono">{{ currentSubnet?.cidr || '' }} ·
-        {{ isFullGrid ? `全量 ${gridCells.length} 格 · 已观测 ${addresses.length}` : `大网段模式 · 已观测 ${addresses.length} 条` }}</span>
+        {{ isFullGrid ? t('全量 {n} 格 · 已观测 {m}', { n: gridCells.length, m: addresses.length }) : t('大网段模式 · 已观测 {n} 条', { n: addresses.length }) }}</span>
     </div>
 
     <!-- IP 网格 -->
     <div v-if="viewMode === 'grid'" class="bg-white rounded-2xl shadow-card border border-slate-100 p-5">
       <div v-if="!subnets.length" class="text-center py-24">
         <div class="w-20 h-20 mx-auto mb-5 rounded-3xl bg-gradient-to-br from-brand-100 to-purple-100 flex items-center justify-center text-4xl">🌐</div>
-        <p class="text-slate-700 font-medium mb-1">还没有受管子网</p>
-        <p class="text-slate-400 text-sm mb-5">添加第一个网段，开始绘制你的 IP 地图</p>
-        <button @click="showAdd = true" class="bg-brand-600 text-white rounded-xl px-5 py-2.5 text-sm font-medium hover:bg-brand-700 active:scale-95 transition shadow-sm shadow-brand-600/30">添加第一个子网</button>
+        <p class="text-slate-700 font-medium mb-1">{{ t('还没有受管子网') }}</p>
+        <p class="text-slate-400 text-sm mb-5">{{ t('添加第一个网段，开始绘制你的 IP 地图') }}</p>
+        <button @click="showAdd = true" class="bg-brand-600 text-white rounded-xl px-5 py-2.5 text-sm font-medium hover:bg-brand-700 active:scale-95 transition shadow-sm shadow-brand-600/30">{{ t('添加第一个子网') }}</button>
       </div>
       <div v-else-if="!visible.length" class="text-center py-24">
         <div class="w-20 h-20 mx-auto mb-5 rounded-3xl bg-slate-100 flex items-center justify-center text-4xl">📡</div>
-        <p class="text-slate-700 font-medium mb-1">还没有观测数据</p>
-        <p class="text-slate-400 text-sm">点击右上角「⚡ 立即扫描」开始发现设备</p>
+        <p class="text-slate-700 font-medium mb-1">{{ t('还没有观测数据') }}</p>
+        <p class="text-slate-400 text-sm">{{ t('点击右上角「⚡ 立即扫描」开始发现设备') }}</p>
       </div>
       <div v-else class="grid gap-[2px]" style="grid-template-columns: repeat(32, minmax(0,1fr))">
         <button
@@ -285,7 +287,7 @@ onUnmounted(() => poller && clearInterval(poller))
             class="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1 z-50 whitespace-nowrap
                    bg-ink-800 text-white text-[10px] leading-tight font-medium font-sans rounded-md px-1.5 py-1 shadow-pop
                    opacity-0 -translate-y-0.5 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-150">
-            {{ a.ip }}　{{ statusText[a.status] || a.status }}<template v-if="a.label">　{{ a.label }}</template>
+            {{ a.ip }}　{{ statusText(a.status) }}<template v-if="a.label">　{{ a.label }}</template>
             <i class="absolute left-1/2 -translate-x-1/2 top-full border-[3px] border-transparent border-t-ink-800"></i>
           </span></button>
       </div>
@@ -296,10 +298,10 @@ onUnmounted(() => poller && clearInterval(poller))
       <table class="w-full text-sm">
         <thead>
           <tr class="text-left text-xs uppercase tracking-wider text-slate-400 border-b border-slate-100 bg-slate-50/60">
-            <th class="px-5 py-3 font-medium">IP</th><th class="px-4 py-3 font-medium">状态</th>
-            <th class="px-4 py-3 font-medium">MAC</th><th class="px-4 py-3 font-medium">主机名</th>
-            <th class="px-4 py-3 font-medium">标注</th><th class="px-4 py-3 font-medium">负责人</th>
-            <th class="px-4 py-3 font-medium">最后在线</th>
+            <th class="px-5 py-3 font-medium">IP</th><th class="px-4 py-3 font-medium">{{ t('状态') }}</th>
+            <th class="px-4 py-3 font-medium">MAC</th><th class="px-4 py-3 font-medium">{{ t('主机名') }}</th>
+            <th class="px-4 py-3 font-medium">{{ t('标注') }}</th><th class="px-4 py-3 font-medium">{{ t('负责人') }}</th>
+            <th class="px-4 py-3 font-medium">{{ t('最后在线') }}</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-slate-50">
@@ -312,7 +314,7 @@ onUnmounted(() => poller && clearInterval(poller))
                              a.status === 'conflict' ? 'bg-red-50 text-conflict' :
                              a.status === 'reserved' ? 'bg-purple-50 text-reserved' :
                              a.status === 'rogue' ? 'bg-orange-50 text-rogue' : 'bg-slate-100 text-slate-500']">
-                {{ statusText[a.status] || a.status }}
+                {{ statusText(a.status) }}
               </span>
             </td>
             <td class="px-4 py-2.5 font-mono text-xs text-slate-500">{{ a.mac || '—' }}</td>
@@ -323,7 +325,7 @@ onUnmounted(() => poller && clearInterval(poller))
           </tr>
           <tr v-if="!listRows.length">
             <td colspan="7" class="px-4 py-16 text-center text-slate-400">
-              {{ subnets.length ? '暂无已观测地址，点击「立即扫描」发现设备' : '还没有受管子网' }}
+              {{ subnets.length ? t('暂无已观测地址，点击「立即扫描」发现设备') : t('还没有受管子网') }}
             </td>
           </tr>
         </tbody>
@@ -346,7 +348,7 @@ onUnmounted(() => poller && clearInterval(poller))
                            selected.status === 'reserved' ? 'bg-purple-50 text-reserved' :
                            selected.status === 'rogue' ? 'bg-orange-50 text-rogue' : 'bg-slate-100 text-slate-500']">
               <i :class="['w-1.5 h-1.5 rounded-full', legend.find(l => l.key === selected?.status)?.dot || 'bg-slate-400']"></i>
-              {{ statusText[selected.status] || selected.status }}
+              {{ statusText(selected.status) }}
             </span>
           </div>
           <button @click="selected = null" class="w-8 h-8 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition">✕</button>
@@ -355,40 +357,40 @@ onUnmounted(() => poller && clearInterval(poller))
         <div class="flex-1 overflow-y-auto px-6 py-5">
           <dl class="grid grid-cols-2 gap-3 mb-6">
             <div class="bg-slate-50 rounded-xl p-3">
-              <dt class="text-xs text-slate-400 mb-1">MAC 地址</dt>
+              <dt class="text-xs text-slate-400 mb-1">{{ t('MAC 地址') }}</dt>
               <dd class="font-mono text-sm text-slate-700 break-all">{{ selected.mac || '—' }}</dd>
             </div>
             <div class="bg-slate-50 rounded-xl p-3">
-              <dt class="text-xs text-slate-400 mb-1">主机名</dt>
+              <dt class="text-xs text-slate-400 mb-1">{{ t('主机名') }}</dt>
               <dd class="text-sm text-slate-700 break-all">{{ selected.hostname || '—' }}</dd>
             </div>
             <div class="bg-slate-50 rounded-xl p-3">
-              <dt class="text-xs text-slate-400 mb-1">首次发现</dt>
+              <dt class="text-xs text-slate-400 mb-1">{{ t('首次发现') }}</dt>
               <dd class="text-sm text-slate-700">{{ fmtTime(selected.first_seen) || '—' }}</dd>
             </div>
             <div class="bg-slate-50 rounded-xl p-3">
-              <dt class="text-xs text-slate-400 mb-1">最后在线</dt>
-              <dd class="text-sm text-slate-700">{{ fmtTime(selected.last_seen) || '从未在线' }}</dd>
+              <dt class="text-xs text-slate-400 mb-1">{{ t('最后在线') }}</dt>
+              <dd class="text-sm text-slate-700">{{ fmtTime(selected.last_seen) || t('从未在线') }}</dd>
             </div>
           </dl>
 
           <template v-if="selected.id">
-            <label class="block text-sm font-medium text-slate-600 mb-3">标注
-              <input v-model="selected.label" class="border border-slate-200 rounded-xl w-full px-3 py-2 mt-1.5 font-normal" placeholder="如：张三的笔记本" /></label>
-            <label class="block text-sm font-medium text-slate-600 mb-3">负责人
+            <label class="block text-sm font-medium text-slate-600 mb-3">{{ t('标注') }}
+              <input v-model="selected.label" class="border border-slate-200 rounded-xl w-full px-3 py-2 mt-1.5 font-normal" :placeholder="t('如：张三的笔记本')" /></label>
+            <label class="block text-sm font-medium text-slate-600 mb-3">{{ t('负责人') }}
               <DictSelect v-model="selected.owner" :options="dictOwners" /></label>
-            <label class="block text-sm font-medium text-slate-600 mb-2">类型
-              <DictSelect v-model="selected.dev_type" :options="dictTypes" placeholder="未分类" /></label>
+            <label class="block text-sm font-medium text-slate-600 mb-2">{{ t('类型') }}
+              <DictSelect v-model="selected.dev_type" :options="dictTypes" :placeholder="t('未分类')" /></label>
           </template>
           <div v-else class="bg-slate-50 rounded-xl p-4 text-sm text-slate-400 text-center">
-            该地址尚未被观测到，扫描发现后即可标注。
+            {{ t('该地址尚未被观测到，扫描发现后即可标注。') }}
           </div>
         </div>
 
         <footer class="px-6 py-4 border-t border-slate-100 flex gap-3">
           <button v-if="selected.id && !isViewer()" @click="save"
-                  class="flex-1 bg-brand-600 text-white rounded-xl px-4 py-2.5 text-sm font-medium hover:bg-brand-700 active:scale-[0.98] transition shadow-sm shadow-brand-600/30">保存标注</button>
-          <button @click="selected = null" class="border border-slate-200 rounded-xl px-5 py-2.5 text-sm text-slate-500 hover:bg-slate-50 transition">关闭</button>
+                  class="flex-1 bg-brand-600 text-white rounded-xl px-4 py-2.5 text-sm font-medium hover:bg-brand-700 active:scale-[0.98] transition shadow-sm shadow-brand-600/30">{{ t('保存标注') }}</button>
+          <button @click="selected = null" class="border border-slate-200 rounded-xl px-5 py-2.5 text-sm text-slate-500 hover:bg-slate-50 transition">{{ t('关闭') }}</button>
         </footer>
       </aside>
     </Teleport>

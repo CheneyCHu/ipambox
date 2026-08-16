@@ -2,6 +2,8 @@
 
 > 插上网线就能用的 IP 地址管家盒子 —— 面向中小企业的轻量级 IPAM。
 
+[English README](README_EN.md)
+
 ## 目录结构
 
 ```

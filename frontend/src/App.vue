@@ -136,7 +136,7 @@ const isActive = (path: string) => route.path.startsWith(path)
             </span>
             <template v-if="!collapsed">
               <span class="text-xs font-medium">{{ uplink.online ? t('app.uplink.online') : t('app.uplink.offline') }}</span>
-              <span v-if="uplinkPending > 0" class="ml-auto text-[10px] bg-amber-400/15 text-amber-300 rounded-full px-1.5 py-px">补发 {{ uplinkPending }}</span>
+              <span v-if="uplinkPending > 0" class="ml-auto text-[10px] bg-amber-400/15 text-amber-300 rounded-full px-1.5 py-px">{{ t('补发') }} {{ uplinkPending }}</span>
             </template>
             <span v-if="collapsed"
                   class="pointer-events-none absolute left-full ml-3 top-1/2 -translate-y-1/2 z-50 whitespace-pre-line

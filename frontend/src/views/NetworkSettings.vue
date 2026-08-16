@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { api, type NetInterface } from '../api'
+import { t } from '../i18n'
 import NicConfigEditor from '../components/NicConfigEditor.vue'
 
 const ifaces = ref<NetInterface[]>([])
@@ -16,7 +17,7 @@ async function load() {
   loadError.value = ''
   try {
     ifaces.value = await api.netInterfaces()
-  } catch (e: any) { loadError.value = '加载失败：' + e.message }
+  } catch (e: any) { loadError.value = t('加载失败：') + e.message }
 }
 onMounted(load)
 </script>
@@ -24,8 +25,8 @@ onMounted(load)
 <template>
   <div class="animate-fade-in max-w-3xl">
     <header class="mb-5">
-      <h1 class="text-2xl font-bold text-slate-900 tracking-tight">网络设置</h1>
-      <p class="text-sm text-slate-400 mt-1">查看并配置本机物理网卡的 IPv4 / IPv6 地址（修改需要 root 权限）</p>
+      <h1 class="text-2xl font-bold text-slate-900 tracking-tight">{{ t('网络设置') }}</h1>
+      <p class="text-sm text-slate-400 mt-1">{{ t('查看并配置本机物理网卡的 IPv4 / IPv6 地址（修改需要 root 权限）') }}</p>
     </header>
 
     <div v-if="loadError" class="bg-red-50 border border-red-200 text-conflict rounded-xl px-4 py-2.5 mb-4 text-sm">{{ loadError }}</div>
@@ -37,18 +38,18 @@ onMounted(load)
           <p class="font-mono font-semibold text-slate-800">{{ nic.name }}
             <span v-if="nic.port_name && nic.port_name !== nic.name" class="text-xs font-sans font-normal text-slate-400 ml-1">{{ nic.port_name }}</span>
             <span :class="nic.up ? 'bg-emerald-100 text-online' : 'bg-slate-100 text-slate-400'"
-                  class="text-xs font-sans font-medium rounded-full px-2 py-0.5 ml-2">{{ nic.up ? '已启用' : '未启用' }}</span>
+                  class="text-xs font-sans font-medium rounded-full px-2 py-0.5 ml-2">{{ nic.up ? t('已启用') : t('未启用') }}</span>
             <span v-if="nic.ipv4_mode"
                   :class="['text-xs font-sans font-medium rounded-full px-2 py-0.5 ml-1.5',
                            nic.ipv4_mode === 'dhcp' ? 'bg-sky-100 text-sky-600' : 'bg-amber-100 text-amber-600']">
-              {{ nic.ipv4_mode === 'dhcp' ? 'DHCP' : '手动' }}
+              {{ nic.ipv4_mode === 'dhcp' ? 'DHCP' : t('手动') }}
             </span>
           </p>
-          <p class="text-xs text-slate-400 font-mono">{{ nic.mac || '无 MAC' }} · MTU {{ nic.mtu }}</p>
+          <p class="text-xs text-slate-400 font-mono">{{ nic.mac || t('无 MAC') }} · MTU {{ nic.mtu }}</p>
         </div>
         <button @click="editing = editing === nic.name ? '' : nic.name"
                 class="border border-slate-200 rounded-xl px-4 py-1.5 text-sm text-slate-600 hover:border-brand-500 hover:text-brand-600 active:scale-95 transition">
-          {{ editing === nic.name ? '收起' : '配置地址' }}
+          {{ editing === nic.name ? t('收起') : t('配置地址') }}
         </button>
       </div>
 
@@ -68,7 +69,7 @@ onMounted(load)
           </dd>
         </div>
       </dl>
-      <p v-if="nic.gateway" class="text-xs text-slate-400 font-mono mb-2">默认网关：{{ nic.gateway }}</p>
+      <p v-if="nic.gateway" class="text-xs text-slate-400 font-mono mb-2">{{ t('默认网关：') }}{{ nic.gateway }}</p>
 
       <div v-if="editing === nic.name" class="space-y-2 animate-fade-in">
         <NicConfigEditor :name="nic.name" family="ipv4"
@@ -80,6 +81,6 @@ onMounted(load)
       </div>
     </div>
 
-    <p v-if="!ifaces.length && !loadError" class="text-slate-400 text-center py-16">未检测到物理网卡</p>
+    <p v-if="!ifaces.length && !loadError" class="text-slate-400 text-center py-16">{{ t('未检测到物理网卡') }}</p>
   </div>
 </template>
