@@ -80,7 +80,7 @@ func compareVersion(a, b string) int {
 func (h *handlers) manifestURL() string {
 	v, _ := h.db.GetSetting("update_manifest_url")
 	if strings.TrimSpace(v) == "" {
-		v = "https://raw.githubusercontent.com/ipambox/ipambox/main/release/latest.json"
+		v = "https://raw.githubusercontent.com/CheneyCHu/ipambox/main/release/latest.json"
 	}
 	return v
 }

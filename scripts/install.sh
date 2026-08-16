@@ -15,7 +15,7 @@ PORT=18080
 DIR=""
 NO_SERVICE=0
 LOCAL_BIN=""
-DOWNLOAD_BASE="${IPAMBOX_DOWNLOAD_BASE:-https://raw.githubusercontent.com/ipambox/ipambox/main/release}"
+DOWNLOAD_BASE="${IPAMBOX_DOWNLOAD_BASE:-https://github.com/CheneyCHu/ipambox/releases/latest/download}"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in

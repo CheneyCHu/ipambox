@@ -3,11 +3,11 @@
 ## 一键安装（用户侧）
 
 ```bash
-# 在线安装（把 OWNER/REPO 换成你的仓库）
-curl -fsSL https://raw.githubusercontent.com/OWNER/REPO/main/scripts/install.sh | bash
+# 在线安装（把 CheneyCHu/ipambox 换成你的仓库）
+curl -fsSL https://raw.githubusercontent.com/CheneyCHu/ipambox/main/scripts/install.sh | bash
 
 # 或指定二进制来源
-IPAMBOX_DOWNLOAD_BASE=https://github.com/OWNER/REPO/releases/latest/download \
+IPAMBOX_DOWNLOAD_BASE=https://github.com/CheneyCHu/ipambox/releases/latest/download \
   bash scripts/install.sh
 ```
 
@@ -29,7 +29,7 @@ GitHub Actions 自动完成：
 
 ## 设备端 OTA
 
-- 默认检查地址：`https://raw.githubusercontent.com/OWNER/REPO/main/release/latest.json`
+- 默认检查地址：`https://raw.githubusercontent.com/CheneyCHu/ipambox/main/release/latest.json`
   （部署后请在「设置」页把 `update_manifest_url` 改为你的仓库地址，或直接改代码默认值）
 - 设备按自身平台（GOOS/GOARCH）自动选择安装包，SHA256 校验通过后才替换
 - 替换原子化，旧版本备份为 `.bak`，失败自动回滚；升级后自动重启
