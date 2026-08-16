@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IPAMBox 原型 — 办公网 192.168.1.0/24</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+tailwind.config = { theme: { extend: { colors: {
+  online:'#16A34A', offline:'#9CA3AF', conflict:'#DC2626', reserved:'#9333EA', rogue:'#EA580C' } } } }
+</script>
+<style>
+  .cell { transition: transform .1s; cursor: pointer; }
+  .cell:hover { transform: scale(1.5); z-index: 10; position: relative; }
+  @keyframes pulse-red { 0%,100%{opacity:1} 50%{opacity:.4} }
+  .blink { animation: pulse-red 1s infinite; }
+</style>
+</head>
+<body class="bg-gray-50 text-gray-800">
+<!-- 顶部导航 -->
+<nav class="bg-white border-b px-6 py-3 flex items-center gap-6 sticky top-0 z-40">
+  <span class="font-bold text-blue-600 text-lg">IPAMBox</span>
+  <a class="text-gray-500 hover:text-blue-600 cursor-pointer">仪表盘</a>
+  <a class="text-blue-600 font-medium cursor-pointer">子网</a>
+  <a class="text-gray-500 hover:text-blue-600 cursor-pointer">设备</a>
+  <a class="text-gray-500 hover:text-blue-600 cursor-pointer">告警 <span class="bg-red-100 text-conflict text-xs rounded-full px-2 py-0.5">2</span></a>
+  <a class="text-gray-500 hover:text-blue-600 cursor-pointer">报表</a>
+  <a class="text-gray-500 hover:text-blue-600 cursor-pointer">设置</a>
+  <button onclick="toggleAI()" class="ml-auto bg-blue-600 text-white rounded-full px-4 py-1.5 text-sm">🤖 AI 助手</button>
+</nav>
+
+<main class="max-w-7xl mx-auto p-6">
+  <!-- 汇总卡片 -->
+  <div class="flex items-end justify-between mb-4">
+    <div>
+      <h1 class="text-xl font-semibold">办公网 <span class="font-mono text-gray-500">192.168.1.0/24</span></h1>
+      <p class="text-sm text-gray-500 mt-1">使用率 <b class="text-gray-800">62%</b> · 在线 <b class="text-online">87</b> · 离线 <b class="text-offline">42</b> · 闲置 <b>95</b> · 冲突 <b class="text-conflict">2</b></p>
+    </div>
+    <div class="flex gap-2">
+      <input id="search" oninput="renderGrid()" placeholder="搜索 IP / MAC / 名称…" class="border rounded px-3 py-1.5 text-sm w-56">
+      <button class="bg-blue-600 text-white rounded px-4 py-1.5 text-sm" onclick="alert('已触发扫描（原型演示）')">立即扫描</button>
+      <button class="border rounded px-4 py-1.5 text-sm">导出</button>
+    </div>
+  </div>
+  <!-- 图例 -->
+  <div class="flex gap-4 text-sm mb-3">
+    <span><i class="inline-block w-3 h-3 rounded-sm bg-online"></i> 在线</span>
+    <span><i class="inline-block w-3 h-3 rounded-sm bg-offline"></i> 离线</span>
+    <span><i class="inline-block w-3 h-3 rounded-sm bg-white border border-gray-300"></i> 闲置</span>
+    <span><i class="inline-block w-3 h-3 rounded-sm bg-conflict"></i> 冲突</span>
+    <span><i class="inline-block w-3 h-3 rounded-sm bg-reserved"></i> 保留</span>
+    <span><i class="inline-block w-3 h-3 rounded-sm bg-rogue"></i> 未授权</span>
+  </div>
+
+  <div class="flex gap-6">
+    <!-- IP 网格 -->
+    <div class="flex-1 bg-white rounded-lg shadow-sm p-4">
+      <div id="grid" class="grid gap-1" style="grid-template-columns: repeat(16, minmax(0,1fr))"></div>
+    </div>
+    <!-- 详情抽屉 -->
+    <aside id="drawer" class="w-80 bg-white rounded-lg shadow-sm p-5 hidden shrink-0">
+      <div class="flex justify-between items-start">
+        <h3 id="d-ip" class="font-mono font-semibold text-lg"></h3>
+        <button onclick="drawer.classList.add('hidden')" class="text-gray-400">✕</button>
+      </div>
+      <p id="d-status" class="text-sm mb-3"></p>
+      <div id="d-conflict" class="hidden bg-red-50 border border-red-200 text-conflict text-sm rounded p-2 mb-3"></div>
+      <p class="text-sm text-gray-600 mb-1">MAC：<span id="d-mac" class="font-mono"></span></p>
+      <p class="text-sm text-gray-600 mb-3">主机名：<span id="d-host"></span></p>
+      <label class="block text-sm mb-2">标注 <input id="d-label" class="border rounded w-full px-2 py-1 mt-1"></label>
+      <label class="block text-sm mb-2">负责人 <input id="d-owner" class="border rounded w-full px-2 py-1 mt-1"></label>
+      <label class="block text-sm mb-4">类型
+        <select id="d-type" class="border rounded w-full px-2 py-1 mt-1">
+          <option>办公终端</option><option>打印机</option><option>服务器</option><option>AP/网络设备</option><option>IoT</option>
+        </select></label>
+      <div class="flex gap-2">
+        <button class="bg-blue-600 text-white rounded px-4 py-1.5 text-sm" onclick="alert('已保存（原型演示）')">保存</button>
+        <button class="border rounded px-3 py-1.5 text-sm">设为保留</button>
+      </div>
+    </aside>
+  </div>
+</main>
+
+<!-- AI 助手抽屉 -->
+<div id="ai" class="fixed top-0 right-0 h-full w-96 bg-white shadow-2xl hidden flex-col z-50">
+  <header class="p-4 border-b flex justify-between items-center font-medium">🤖 AI 助手
+    <button onclick="toggleAI()" class="text-gray-400">✕</button></header>
+  <div class="flex-1 overflow-y-auto p-4 space-y-3 text-sm">
+    <div class="text-right"><span class="inline-block bg-blue-600 text-white rounded-lg px-3 py-2">1.50 冲突是怎么回事？</span></div>
+    <div><span class="inline-block bg-gray-100 rounded-lg px-3 py-2 max-w-[90%]">从昨天 14:02 起，MAC <b class="font-mono">AA:BB:…:F1</b>（张三的笔记本，已登记）与 <b class="font-mono">CC:DD:…:9E</b>（首次出现）同时声称 192.168.1.50。后者疑似私接设备，建议先登记或在交换机上定位端口。<br><a class="text-blue-600 cursor-pointer">查看冲突时间轴 →</a></span></div>
+    <div class="text-right"><span class="inline-block bg-blue-600 text-white rounded-lg px-3 py-2">还有哪些空闲 IP？</span></div>
+    <div><span class="inline-block bg-gray-100 rounded-lg px-3 py-2 max-w-[90%]">本网段还有 <b>95 个</b>空闲地址，最长连续空闲段为 192.168.1.160–192.168.1.199（40 个）。<br><a class="text-blue-600 cursor-pointer">生成报表 →</a></span></div>
+  </div>
+  <footer class="p-3 border-t flex gap-2">
+    <input placeholder="输入问题，如：下周能回收哪些 IP？" class="border rounded flex-1 px-3 py-2 text-sm">
+    <button class="bg-blue-600 text-white rounded px-3">📤</button>
+  </footer>
+</div>
+
+<script>
+// ---- 生成演示数据 ----
+const names = {1:['核心网关','网络设备'],10:['文件服务器','服务器'],50:['张三的笔记本','办公终端'],51:['冲突设备-未知','办公终端'],87:['新设备(Apple)','办公终端'],120:['HP 打印机','打印机'],200:['会议室AP','AP/网络设备']};
+const statusColor = {online:'bg-online', offline:'bg-offline', free:'bg-white border border-gray-300',
+  conflict:'bg-conflict blink', reserved:'bg-reserved', rogue:'bg-rogue'};
+const data = [];
+let seed = 42;
+const rnd = () => (seed = (seed*9301+49297)%233280) / 233280;
+for (let i = 0; i < 254; i++) {
+  const n = i + 1, r = rnd();
+  let st = r < 0.35 ? 'online' : r < 0.52 ? 'offline' : 'free';
+  if (n === 50 || n === 51) st = 'conflict';
+  if (n === 87) st = 'rogue';
+  if (n === 1 || n === 10) st = 'reserved';
+  data.push({ ip:`192.168.1.${n}`, status:st,
+    label:names[n]?.[0]||'', type:names[n]?.[1]||'办公终端',
+    mac: st==='free'?'':'3C:22:FB:'+String(n).padStart(2,'0')+':4A:'+(10+n%80),
+    host: st==='online'?'host-'+n:'' });
+}
+
+const grid = document.getElementById('grid');
+const drawer = document.getElementById('drawer');
+function renderGrid() {
+  const q = document.getElementById('search').value.trim();
+  grid.innerHTML = '';
+  for (const d of data) {
+    if (q && !d.ip.includes(q) && !d.label.includes(q) && !d.mac.includes(q)) continue;
+    const b = document.createElement('button');
+    b.className = `cell aspect-square rounded-sm ${statusColor[d.status]}`;
+    b.title = `${d.ip} ${d.label}`;
+    b.onclick = () => showDetail(d);
+    grid.appendChild(b);
+  }
+}
+function showDetail(d) {
+  drawer.classList.remove('hidden');
+  document.getElementById('d-ip').textContent = d.ip;
+  document.getElementById('d-status').innerHTML =
+    {online:'<b class="text-online">● 在线</b>',offline:'<b class="text-offline">● 离线</b>',
+     free:'<b class="text-gray-400">● 闲置</b>',conflict:'<b class="text-conflict">● 冲突</b>',
+     reserved:'<b class="text-reserved">● 保留</b>',rogue:'<b class="text-rogue">● 未授权设备</b>'}[d.status]
+    + ' · 最后在线 10:32';
+  const c = document.getElementById('d-conflict');
+  c.classList.toggle('hidden', d.status !== 'conflict');
+  c.textContent = '⚠ 两个 MAC 同时在使用此 IP，建议排查私接设备';
+  document.getElementById('d-mac').textContent = d.mac || '—';
+  document.getElementById('d-host').textContent = d.host || '—';
+  document.getElementById('d-label').value = d.label;
+  document.getElementById('d-owner').value = d.label ? '张三' : '';
+  document.getElementById('d-type').value = d.type;
+}
+function toggleAI() {
+  const ai = document.getElementById('ai');
+  ai.classList.toggle('hidden'); ai.classList.toggle('flex');
+}
+renderGrid();
+</script>
+</body>
+</html>
