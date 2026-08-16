@@ -150,7 +150,13 @@ async function req<T>(path: string, init?: RequestInit): Promise<T> {
     location.href = '/wizard'
     throw new ApiError(428, 'not_initialized')
   }
-  if (!res.ok) throw new ApiError(res.status, await res.text())
+  if (!res.ok) {
+    // 后端错误体为 {"error":"…"}，提取可读信息而非展示整段 JSON
+    const raw = await res.text()
+    let msg = raw
+    try { const j = JSON.parse(raw); if (j && typeof j.error === 'string') msg = j.error } catch { /* 非 JSON 原样展示 */ }
+    throw new ApiError(res.status, msg)
+  }
   return res.json()
 }
 
@@ -181,7 +187,13 @@ export const api = {
       headers: { Authorization: `Bearer ${token.get()}`, 'Content-Type': 'application/octet-stream' },
       body: file,
     })
-    if (!res.ok) throw new ApiError(res.status, await res.text())
+    if (!res.ok) {
+    // 后端错误体为 {"error":"…"}，提取可读信息而非展示整段 JSON
+    const raw = await res.text()
+    let msg = raw
+    try { const j = JSON.parse(raw); if (j && typeof j.error === 'string') msg = j.error } catch { /* 非 JSON 原样展示 */ }
+    throw new ApiError(res.status, msg)
+  }
     return res.json()
   },
   subnets: () => req<Subnet[]>('/subnets/'),

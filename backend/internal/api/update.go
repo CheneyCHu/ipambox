@@ -77,12 +77,32 @@ func compareVersion(a, b string) int {
 	return 0
 }
 
-func (h *handlers) manifestURL() string {
+// 默认清单地址：jsDelivr CDN（国内可达性好）；raw.githubusercontent.com 作为兜底
+var defaultManifestURLs = []string{
+	"https://cdn.jsdelivr.net/gh/CheneyCHu/ipambox@main/release/latest.json",
+	"https://raw.githubusercontent.com/CheneyCHu/ipambox/main/release/latest.json",
+}
+
+// manifestURLs 返回候选清单地址。用户自定义为其他地址时只用该地址（尊重企业内网清单）；
+// 未设置、或设置的是内置默认地址之一时，依次尝试内置 CDN / raw 兜底。
+func (h *handlers) manifestURLs() []string {
 	v, _ := h.db.GetSetting("update_manifest_url")
-	if strings.TrimSpace(v) == "" {
-		v = "https://raw.githubusercontent.com/CheneyCHu/ipambox/main/release/latest.json"
+	v = strings.TrimSpace(v)
+	if v == "" {
+		return defaultManifestURLs
 	}
-	return v
+	for _, d := range defaultManifestURLs {
+		if v == d { // 配的是内置地址：优先用用户选的那个，再兜底其他内置地址
+			out := []string{v}
+			for _, d2 := range defaultManifestURLs {
+				if d2 != v {
+					out = append(out, d2)
+				}
+			}
+			return out
+		}
+	}
+	return []string{v}
 }
 
 func fetchManifest(url string) (*updateManifest, error) {
@@ -108,9 +128,22 @@ func fetchManifest(url string) (*updateManifest, error) {
 	return &m, nil
 }
 
+// fetchManifestAny 依次尝试候选清单地址，全部失败时返回最后一个错误。
+func (h *handlers) fetchManifestAny() (*updateManifest, error) {
+	var lastErr error
+	for _, u := range h.manifestURLs() {
+		m, err := fetchManifest(u)
+		if err == nil {
+			return m, nil
+		}
+		lastErr = err
+	}
+	return nil, lastErr
+}
+
 // UpdateCheck 检查是否有新版本（不下载）。
 func (h *handlers) UpdateCheck(w http.ResponseWriter, _ *http.Request) {
-	m, err := fetchManifest(h.manifestURL())
+	m, err := h.fetchManifestAny()
 	if err != nil {
 		writeErr(w, 502, err)
 		return
@@ -125,7 +158,7 @@ func (h *handlers) UpdateCheck(w http.ResponseWriter, _ *http.Request) {
 
 // UpdateApply 下载清单中的新二进制并原地替换重启（仅管理员）。
 func (h *handlers) UpdateApply(w http.ResponseWriter, _ *http.Request) {
-	m, err := fetchManifest(h.manifestURL())
+	m, err := h.fetchManifestAny()
 	if err != nil {
 		writeErr(w, 502, err)
 		return
