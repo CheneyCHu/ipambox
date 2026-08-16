@@ -96,3 +96,11 @@ bash scripts/e2e_test.sh        # 81 项自动化 E2E 走查（独立端口+独�
 - [x] M2.6：MAC 跨平台获取（macOS `arp -a`）+ 反向 DNS 主机名；网格正方形化；详情时间本地化；**子网管理页**（增删改查）；IP 地图网格/列表切换；网卡按真实硬件端口过滤 + DHCP 状态回显；**使用率按网段容量修正**（修复始终 100%）；设备台账编辑/删除/手工登记保留地址；设置页扫描计划可配（间隔 + 开关，引擎动态读取）
 - [ ] M3：V1.5（DHCP 租约、SNMP 端口定位、rogue 检测、钉钉/企微、Webhook 通知）
 - [ ] M4：V2.0（AI 写操作、插件机制、NetBox/phpIPAM 同步、多站点）
+
+## 反馈与交流
+
+- **报 Bug / 提需求**：[GitHub Issues](https://github.com/CheneyCHu/ipambox/issues)
+- **邮箱**：cheneychu@qq.com
+- **安全漏洞**：请私下邮件联系，详见 [SECURITY.md](SECURITY.md)
+
+如果这个项目对你有帮助，欢迎点个 Star ⭐

@@ -107,3 +107,11 @@ GitHub Actions builds binaries for darwin/amd64, darwin/arm64, linux/amd64 and l
 - [x] M2.5/2.6: NIC-bound subnets, network settings page, routes page, subnet management, grid/list toggle, usage fixed to segment capacity
 - [x] M3 (partial): DingTalk/WeCom/Webhook notifications, read-only account, backup/restore, OTA updates, offline autonomy, bilingual UI
 - [ ] M4: AI write operations, plugin mechanism, NetBox/phpIPAM sync, multi-site
+
+## Feedback & Contact
+
+- **Bug reports / feature requests**: [GitHub Issues](https://github.com/CheneyCHu/ipambox/issues)
+- **Email**: cheneychu@qq.com
+- **Security vulnerabilities**: please report privately via email — see [SECURITY.md](SECURITY.md)
+
+If this project helps you, a Star ⭐ is appreciated!
