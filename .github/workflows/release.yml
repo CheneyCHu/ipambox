@@ -46,7 +46,8 @@ jobs:
           - { os: ubuntu-latest, goos: linux, goarch: amd64 }
           - { os: ubuntu-latest, goos: linux, goarch: arm64, cc: aarch64-linux-gnu-gcc }
           - { os: macos-latest, goos: darwin, goarch: arm64 }
-          - { os: macos-13, goos: darwin, goarch: amd64 }
+          # macos-13（Intel）runner 已退役，在 Apple Silicon runner 上用 clang -arch 交叉出 amd64
+          - { os: macos-latest, goos: darwin, goarch: amd64, cc: 'clang -arch x86_64' }
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
