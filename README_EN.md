@@ -4,6 +4,16 @@
 
 [中文文档](README.md)
 
+## Screenshots
+
+| Dashboard | IP Map |
+| --- | --- |
+| ![Dashboard](docs/screenshots/dashboard-en.jpg) | ![IP Map](docs/screenshots/ip-map-en.jpg) |
+
+| Devices | Alerts |
+| --- | --- |
+| ![Devices](docs/screenshots/devices.jpg) | ![Alerts](docs/screenshots/alerts.jpg) |
+
 IPAMBox runs as a **single binary** on low-cost hardware (Raspberry Pi, mini PC, any Linux/macOS box). It discovers devices on your LAN, visualizes every IP on a live grid map, detects conflicts and rogue devices, keeps an inventory, pushes alerts — and can answer questions in natural language through a built-in AI assistant.
 
 ## Features
@@ -26,8 +36,20 @@ IPAMBox runs as a **single binary** on low-cost hardware (Raspberry Pi, mini PC,
 
 ## Quick start
 
+One-click install (Linux / Raspberry Pi / macOS):
+
 ```bash
-# Download a prebuilt binary from Releases, or build from source:
+curl -fsSL https://github.com/CheneyCHu/ipambox/releases/latest/download/install.sh | bash
+```
+
+- Auto-detects OS/arch (linux/amd64, linux/arm64, darwin/amd64, darwin/arm64) and downloads the latest Release binary.
+- On Linux as root it installs to `/opt/ipambox` and registers a **systemd service** (auto-start on boot); otherwise it installs to `~/ipambox`.
+- Options: `--dir <path>`, `--port <port>`, `--no-service`, `--local <binary>`.
+- Then open `http://<device-ip>:18080` and finish the 3-step wizard.
+
+Or build from source:
+
+```bash
 cd frontend && npm install && npm run build
 rm -rf ../backend/internal/api/web/* && cp -r dist/* ../backend/internal/api/web/
 cd ../backend && go mod tidy && go build -o ipambox ./cmd/server

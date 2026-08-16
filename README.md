@@ -4,6 +4,31 @@
 
 [English README](README_EN.md)
 
+## 界面预览
+
+| 仪表盘 | IP 地图 |
+| --- | --- |
+| ![仪表盘](docs/screenshots/dashboard.jpg) | ![IP 地图](docs/screenshots/ip-map.jpg) |
+
+| 设备台账 | 告警中心 |
+| --- | --- |
+| ![设备台账](docs/screenshots/devices.jpg) | ![告警中心](docs/screenshots/alerts.jpg) |
+
+| 报表 | 设置 |
+| --- | --- |
+| ![报表](docs/screenshots/reports.jpg) | ![设置](docs/screenshots/settings.jpg) |
+
+## 一键安装（Linux / 树莓派 / macOS）
+
+```bash
+curl -fsSL https://github.com/CheneyCHu/ipambox/releases/latest/download/install.sh | bash
+```
+
+- 自动识别系统与架构（linux/amd64、linux/arm64、darwin/amd64、darwin/arm64），下载最新 Release 二进制。
+- Linux 上以 root 运行会自动安装到 `/opt/ipambox` 并注册 **systemd 开机自启服务**；普通用户安装到 `~/ipambox`。
+- 可选参数：`--dir <目录>`、`--port <端口>`、`--no-service`、`--local <本地二进制>`。
+- 安装后浏览器访问 `http://<设备IP>:18080`，按 3 步向导完成初始化。
+
 ## 目录结构
 
 ```
@@ -38,7 +63,8 @@ ipambox/
 ## 快速开始
 
 ```bash
-# 开发模式
+# 方式一：一键安装脚本（见上文）
+# 方式二：开发模式
 cd backend && go mod tidy && go run ./cmd/server   # 后端 :18080
 cd frontend && npm install && npm run dev          # 前端热更新，/api 已代理
 
@@ -54,7 +80,7 @@ GOOS=linux GOARCH=arm64 go build -o ipambox-arm64 ./cmd/server
 ## 测试
 
 ```bash
-bash scripts/e2e_test.sh        # 46 项自动化 E2E 走查（独立端口+独立数据目录）
+bash scripts/e2e_test.sh        # 81 项自动化 E2E 走查（独立端口+独立数据目录）
 ```
 
 2026-08-10 晚：4 轮全量测试 30/30 通过 + AI Function Calling 闭环回归 + 真实局域网扫描验证（详见 git 历史/会话记录）。

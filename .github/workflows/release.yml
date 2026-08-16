@@ -108,7 +108,9 @@ jobs:
         with:
           tag_name: ${{ env.VERSION }}
           name: IPAMBox ${{ env.VERSION }}
-          files: ipambox_*
+          files: |
+            ipambox_*
+            scripts/install.sh
           generate_release_notes: true
       - name: 把 latest.json 提交回 main（设备默认从这里检查更新）
         run: |
