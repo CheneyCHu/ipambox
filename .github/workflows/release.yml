@@ -29,6 +29,7 @@ jobs:
           cd frontend
           npm ci || npm install
           npx vite build
+          mkdir -p ../backend/internal/api/web
           rm -rf ../backend/internal/api/web/*
           cp -r dist/* ../backend/internal/api/web/
       - uses: actions/upload-artifact@v4

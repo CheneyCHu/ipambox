@@ -6,7 +6,9 @@ cd "$(dirname "$0")/.."
 
 VERSION="${1:-1.0.0}"
 echo "==> 构建前端"
+(cd frontend && npm ci --no-audit --no-fund || npm install --no-audit --no-fund)
 (cd frontend && npx vite build)
+mkdir -p backend/internal/api/web
 rm -rf backend/internal/api/web/*
 cp -r frontend/dist/* backend/internal/api/web/
 
