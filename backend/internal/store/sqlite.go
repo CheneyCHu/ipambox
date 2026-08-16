@@ -3,13 +3,17 @@ package store
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"net"
 	"os"
 	"path/filepath"
+	"regexp"
+	"strconv"
+	"strings"
 
-	_ "github.com/mattn/go-sqlite3"
 	"github.com/ipambox/ipambox/internal/models"
+	_ "github.com/mattn/go-sqlite3"
 )
 
 const schema = `
@@ -138,7 +142,77 @@ func Open(path string) (*Store, error) {
 			return nil, fmt.Errorf("migrate alerts params: %w", err)
 		}
 	}
+	migrateAlertParams(db)
 	return &Store{db: db, path: path}, nil
+}
+
+// migrateAlertParams 一次性迁移：把双语功能上线前的中文告警消息解析为结构化 params，
+// 使前端在英文界面也能正确渲染。解析失败的行保持原样（前端回退显示原文）。
+var (
+	reAlertConflict  = regexp.MustCompile(`^IP (\S+) 的 MAC 由 (\S+) 变为 (\S+)，疑似地址冲突$`)
+	reAlertOffline   = regexp.MustCompile(`^(\S+) 有设备离线：(.+)$`)
+	reAlertOffSuffix = regexp.MustCompile(` 等共 (\d+) 个$`)
+	reAlertRecovered = regexp.MustCompile(`^外网连接已恢复。补发通知 (\d+) 条(?:，(\d+) 条仍待补发)?。$`)
+)
+
+func migrateAlertParams(db *sql.DB) {
+	rows, err := db.Query(`SELECT id, type, message FROM alerts WHERE params=''`)
+	if err != nil {
+		return
+	}
+	type row struct {
+		id  int64
+		typ string
+		msg string
+	}
+	var list []row
+	for rows.Next() {
+		var r row
+		if rows.Scan(&r.id, &r.typ, &r.msg) == nil {
+			list = append(list, r)
+		}
+	}
+	rows.Close()
+	for _, r := range list {
+		params := ""
+		switch r.typ {
+		case "conflict":
+			if m := reAlertConflict.FindStringSubmatch(r.msg); m != nil {
+				b, _ := json.Marshal(map[string]string{"ip": m[1], "prev": m[2], "mac": m[3]})
+				params = string(b)
+			}
+		case "offline":
+			if m := reAlertOffline.FindStringSubmatch(r.msg); m != nil {
+				body := m[2]
+				count := 0
+				if sm := reAlertOffSuffix.FindStringSubmatch(body); sm != nil {
+					count, _ = strconv.Atoi(sm[1])
+					body = reAlertOffSuffix.ReplaceAllString(body, "")
+				}
+				ips := strings.Split(body, "、")
+				if count == 0 {
+					count = len(ips)
+				}
+				b, _ := json.Marshal(map[string]any{"cidr": m[1], "ips": ips, "count": count})
+				params = string(b)
+			}
+		case "uplink":
+			if strings.HasPrefix(r.msg, "外网连接中断") {
+				params = `{"kind":"down"}`
+			} else if m := reAlertRecovered.FindStringSubmatch(r.msg); m != nil {
+				sent, _ := strconv.Atoi(m[1])
+				failed := 0
+				if m[2] != "" {
+					failed, _ = strconv.Atoi(m[2])
+				}
+				b, _ := json.Marshal(map[string]any{"kind": "recovered", "sent": sent, "failed": failed})
+				params = string(b)
+			}
+		}
+		if params != "" {
+			_, _ = db.Exec(`UPDATE alerts SET params=? WHERE id=?`, params, r.id)
+		}
+	}
 }
 
 // Close 关闭底层连接。
