@@ -212,7 +212,10 @@ async function doAdd() {
                 {{ statusText(d.status) }}
               </span>
             </td>
-            <td class="px-4 py-3 font-mono text-xs text-slate-500">{{ d.mac || '—' }}</td>
+            <td class="px-4 py-3 font-mono text-xs text-slate-500">
+              {{ d.mac || '—' }}
+              <div v-if="d.vendor" class="font-sans text-xs text-slate-400 mt-0.5">{{ d.vendor }}</div>
+            </td>
             <td class="px-4 py-3 text-slate-600">{{ d.hostname || '—' }}</td>
             <td class="px-4 py-3">
               <span v-if="d.label" class="text-slate-700">{{ d.label }}</span>

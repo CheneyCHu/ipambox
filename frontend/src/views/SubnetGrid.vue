@@ -361,6 +361,10 @@ onUnmounted(() => poller && clearInterval(poller))
               <dd class="font-mono text-sm text-slate-700 break-all">{{ selected.mac || '—' }}</dd>
             </div>
             <div class="bg-slate-50 rounded-xl p-3">
+              <dt class="text-xs text-slate-400 mb-1">{{ t('厂商') }}</dt>
+              <dd class="text-sm text-slate-700 break-all">{{ selected.vendor || '—' }}</dd>
+            </div>
+            <div class="bg-slate-50 rounded-xl p-3">
               <dt class="text-xs text-slate-400 mb-1">{{ t('主机名') }}</dt>
               <dd class="text-sm text-slate-700 break-all">{{ selected.hostname || '—' }}</dd>
             </div>

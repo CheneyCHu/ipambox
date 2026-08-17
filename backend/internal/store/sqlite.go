@@ -551,6 +551,12 @@ func (s *Store) SubnetIDForIP(ipStr string) (int64, bool, error) {
 // MarkSeen 由扫描引擎调用：插入事件并刷新地址状态。
 // mac/hostname 为空时保留已有值，避免后续观测把已获取的信息清空。
 func (s *Store) MarkSeen(ip, mac, hostname, source string) error {
+	return s.MarkSeenRich(ip, mac, hostname, "", "", source)
+}
+
+// MarkSeenRich 在 MarkSeen 基础上携带厂商与推断设备类型：
+// vendor 非空则刷新；devType 仅在该地址从未填写类型时补写（不覆盖人工修改）。
+func (s *Store) MarkSeenRich(ip, mac, hostname, vendor, devType, source string) error {
 	subnetID, ok, err := s.SubnetIDForIP(ip)
 	if err != nil {
 		return err
@@ -567,17 +573,45 @@ func (s *Store) MarkSeen(ip, mac, hostname, source string) error {
 		return err
 	}
 	_, err = tx.Exec(`
-		INSERT INTO addresses(subnet_id,ip,status,mac,hostname,first_seen,last_seen)
-		VALUES(?, ?, 'online', ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+		INSERT INTO addresses(subnet_id,ip,status,mac,hostname,vendor,dev_type,first_seen,last_seen)
+		VALUES(?, ?, 'online', ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
 		ON CONFLICT(subnet_id,ip) DO UPDATE SET
 		  status='online', last_seen=CURRENT_TIMESTAMP,
 		  mac=CASE WHEN excluded.mac='' THEN addresses.mac ELSE excluded.mac END,
-		  hostname=CASE WHEN excluded.hostname='' THEN addresses.hostname ELSE excluded.hostname END`,
-		subnetID, ip, mac, hostname)
+		  hostname=CASE WHEN excluded.hostname='' THEN addresses.hostname ELSE excluded.hostname END,
+		  vendor=CASE WHEN excluded.vendor='' THEN addresses.vendor ELSE excluded.vendor END,
+		  dev_type=CASE WHEN addresses.dev_type='' THEN excluded.dev_type ELSE addresses.dev_type END`,
+		subnetID, ip, mac, hostname, vendor, devType)
 	if err != nil {
 		return err
 	}
 	return tx.Commit()
+}
+
+// ListMissingVendor 返回有 MAC 但尚未识别厂商的地址（启动回填用）。
+func (s *Store) ListMissingVendor() (map[int64]string, error) {
+	rows, err := s.db.Query(`SELECT id, mac FROM addresses WHERE mac<>'' AND vendor=''`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[int64]string{}
+	for rows.Next() {
+		var id int64
+		var mac string
+		if err := rows.Scan(&id, &mac); err != nil {
+			return nil, err
+		}
+		out[id] = mac
+	}
+	return out, nil
+}
+
+// SetVendorType 回填厂商；仅在类型为空时补写推断类型。
+func (s *Store) SetVendorType(id int64, vendor, devType string) error {
+	_, err := s.db.Exec(`UPDATE addresses SET vendor=?,
+		dev_type=CASE WHEN dev_type='' THEN ? ELSE dev_type END WHERE id=?`, vendor, devType, id)
+	return err
 }
 
 // ---- 告警 ----

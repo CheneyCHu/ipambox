@@ -18,6 +18,7 @@ import (
 
 	"github.com/ipambox/ipambox/internal/alert"
 	"github.com/ipambox/ipambox/internal/models"
+	"github.com/ipambox/ipambox/internal/oui"
 	"github.com/ipambox/ipambox/internal/store"
 )
 
@@ -155,7 +156,12 @@ func (e *Engine) scanSubnet(ctx context.Context, sub models.Subnet) error {
 	// 反向 DNS 解析主机名（并发、单个限时，失败静默）
 	hosts := resolveHostnames(seen)
 	for _, o := range seen {
-		if err := e.db.MarkSeen(o.IP, o.MAC, hosts[o.IP], o.Source); err != nil {
+		vendor, devType := "", ""
+		if o.MAC != "" {
+			vendor = oui.Lookup(o.MAC)      // OUI 厂商识别
+			devType = oui.InferType(o.MAC)  // 类型推断（不覆盖人工填写）
+		}
+		if err := e.db.MarkSeenRich(o.IP, o.MAC, hosts[o.IP], vendor, devType, o.Source); err != nil {
 			log.Printf("scanner: mark seen %s: %v", o.IP, err)
 		}
 		// 冲突检测：同一 IP 出现新 MAC → 告警

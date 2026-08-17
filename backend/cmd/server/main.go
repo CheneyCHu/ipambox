@@ -11,6 +11,7 @@ import (
 	"github.com/ipambox/ipambox/internal/alert"
 	"github.com/ipambox/ipambox/internal/api"
 	"github.com/ipambox/ipambox/internal/build"
+	"github.com/ipambox/ipambox/internal/oui"
 	"github.com/ipambox/ipambox/internal/scanner"
 	"github.com/ipambox/ipambox/internal/store"
 	"github.com/ipambox/ipambox/internal/uplink"
@@ -35,6 +36,19 @@ func main() {
 	// 2. 告警器与扫描引擎
 	alerter := alert.New(db)
 	engine := scanner.New(db, alerter)
+
+	// 2.1 启动回填：为存量数据补齐 OUI 厂商与推断设备类型
+	if missing, err := db.ListMissingVendor(); err == nil && len(missing) > 0 {
+		n := 0
+		for id, mac := range missing {
+			if v := oui.Lookup(mac); v != "" {
+				if db.SetVendorType(id, v, oui.InferType(mac)) == nil {
+					n++
+				}
+			}
+		}
+		log.Printf("oui: 回填 %d/%d 条地址的厂商信息", n, len(missing))
+	}
 
 	// 3. 外网连通监测（断网续存/边缘自治）：离线时通知入队，恢复后自动补发
 	mon := uplink.New(db, alerter)

@@ -234,6 +234,7 @@ const enZh: Record<string, string> = {
   '全量 {n} 格 · 已观测 {m}': 'Full grid: {n} cells · {m} observed',
   '大网段模式 · 已观测 {n} 条': 'Large-segment mode · {n} observed',
   '主机名': 'Hostname',
+  '厂商': 'Vendor',
   '标注': 'Label',
   '最后在线': 'Last seen',
   '暂无已观测地址，点击「立即扫描」发现设备': 'No observed addresses — click "Scan now" to discover devices',
