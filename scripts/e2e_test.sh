@@ -46,8 +46,13 @@ check "非法 CIDR 400" "400" "$(curl -s -o /dev/null -w '%{http_code}' -X POST 
 check "IPv6 子网 400" "400" "$(curl -s -o /dev/null -w '%{http_code}' -X POST $B/subnets/ -H "$AUTH" -d '{"cidr":"fd00::/64"}')"
 check "过大前缀 400" "400" "$(curl -s -o /dev/null -w '%{http_code}' -X POST $B/subnets/ -H "$AUTH" -d '{"cidr":"10.0.0.0/7"}')"
 check "触发扫描 202" "202" "$(curl -s -o /dev/null -w '%{http_code}' -X POST $B/subnets/1/scan -H "$AUTH")"
-sleep 5
-check "扫描发现 127.0.0.1" "online" "$(curl -s $B/subnets/1/addresses -H "$AUTH" | python3 -c 'import sys,json;a=json.load(sys.stdin);print(a[0]["status"] if a else "none")')"
+# 扫描为异步：轮询最多 15 秒等待结果（ARP 兜底与反向 DNS 富化会耗时）
+SCAN_ST=""
+for i in $(seq 1 15); do
+  SCAN_ST=$(curl -s $B/subnets/1/addresses -H "$AUTH" | python3 -c 'import sys,json;a=json.load(sys.stdin);print(a[0]["status"] if a else "none")' 2>/dev/null)
+  [[ "$SCAN_ST" == "online" ]] && break; sleep 1
+done
+check "扫描发现 127.0.0.1" "online" "$SCAN_ST"
 check "统计 online=1" "1" "$(curl -s $B/subnets/1/stats -H "$AUTH" | pyget "['online']")"
 
 echo "==> 4. 标注"

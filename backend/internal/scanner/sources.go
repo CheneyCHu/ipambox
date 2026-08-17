@@ -6,6 +6,8 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -50,20 +52,43 @@ func (s ICMPSource) Scan(ctx context.Context, cidr string) ([]Observation, error
 func ping(ctx context.Context, ip string, timeout time.Duration) bool {
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
-	// macOS/Linux 均支持 -c 1 -W/-t；正式版需按 GOOS 适配参数
-	return exec.CommandContext(ctx, "ping", "-c", "1", "-t", "1", ip).Run() == nil
+	// 不能用 -t：macOS/Linux 上 -t 是 TTL，设为 1 会导致跨子网（经网关）的目标全部不可达。
+	// 超时参数：macOS/BSD 的 -W 单位是毫秒，Linux(iputils) 的 -W 单位是秒。
+	var cmd *exec.Cmd
+	if runtime.GOOS == "darwin" {
+		ms := int(timeout.Milliseconds())
+		if ms < 100 {
+			ms = 100
+		}
+		cmd = exec.CommandContext(ctx, "ping", "-c", "1", "-W", strconv.Itoa(ms), ip)
+	} else {
+		sec := int(timeout.Seconds() + 0.5)
+		if sec < 1 {
+			sec = 1
+		}
+		cmd = exec.CommandContext(ctx, "ping", "-c", "1", "-W", strconv.Itoa(sec), ip)
+	}
+	return cmd.Run() == nil
 }
 
 // ARPSource 读取本机 ARP 表作为兜底（ping 不通但同网段通信过的设备）。
+// 只返回属于被扫网段的条目：全量回传会拖慢反向 DNS 富化，且干扰其他子网统计。
 type ARPSource struct{}
 
 func (ARPSource) Name() string { return "arp" }
 
 func (ARPSource) Scan(ctx context.Context, cidr string) ([]Observation, error) {
+	_, ipnet, err := net.ParseCIDR(cidr)
+	if err != nil {
+		return nil, err
+	}
 	var out []Observation
 	for ip, mac := range arpTable() {
 		if mac == "" {
 			continue // 广播/无效条目
+		}
+		if parsed := net.ParseIP(ip); parsed == nil || !ipnet.Contains(parsed) {
+			continue
 		}
 		out = append(out, Observation{IP: ip, MAC: mac, Source: "arp"})
 	}
@@ -88,8 +113,11 @@ func arpTable() map[string]string {
 		}
 		return t
 	}
-	// macOS / BSD
-	out, err := exec.Command("arp", "-a").Output()
+	// macOS / BSD：必须加 -n（不做 DNS 反向解析），否则 DNS 异常时 arp -a 会无限期卡住；
+	// 同时加超时兜底，卡死也不拖垮扫描流程。
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	out, err := exec.CommandContext(ctx, "arp", "-n", "-a").Output()
 	if err != nil {
 		return t
 	}
