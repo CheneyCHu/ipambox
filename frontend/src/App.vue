@@ -62,7 +62,6 @@ const nav = [
   { path: '/subnet-mgr', i18n: 'nav.subnets', icon: 'M12 3l9 5-9 5-9-5 9-5zm-9 8l9 5 9-5M3 15l9 5 9-5' },
   { path: '/network', i18n: 'nav.network', adminOnly: true, icon: 'M12 2a10 10 0 100 20 10 10 0 000-20zM4.1 10a8 8 0 000 4h2.5a17 17 0 010-4H4.1zm13.3 0h2.5a8 8 0 010 4h-2.5a17 17 0 000-4zM8.8 10h6.4a15 15 0 010 4H8.8a15 15 0 010-4zM12 4c1.9 1.4 3 4 3.2 6H8.8C9 8 10.1 5.4 12 4zm0 16c-1.9-1.4-3-4-3.2-6h6.4c-.2 2-1.3 4.6-3.2 6z' },
   { path: '/routes', i18n: 'nav.routes', adminOnly: true, icon: 'M4 17a3 3 0 106 0 3 3 0 00-6 0zm10-10a3 3 0 106 0 3 3 0 00-6 0zM9.2 15.2l5.6-6.4M14 17a3 3 0 106 0 3 3 0 00-6 0z' },
-  { path: '/devices', i18n: 'nav.devices', icon: 'M4 5h16a1 1 0 011 1v9a1 1 0 01-1 1h-7v2h3v2H8v-2h3v-2H4a1 1 0 01-1-1V6a1 1 0 011-1zm1 2v7h14V7H5z' },
   { path: '/alerts', i18n: 'nav.alerts', icon: 'M12 2a7 7 0 00-7 7v4l-2 3v1h18v-1l-2-3V9a7 7 0 00-7-7zm-2 16a2 2 0 104 0h-4z' },
   { path: '/reports', i18n: 'nav.reports', icon: 'M4 20V10h4v10H4zm6 0V4h4v16h-4zm6 0v-7h4v7h-4z' },
   { path: '/settings', i18n: 'nav.settings', adminOnly: true, icon: 'M19.4 13a7.6 7.6 0 000-2l2-1.6-2-3.4-2.4 1a7.5 7.5 0 00-1.7-1L14.8 3h-4l-.5 2.6a7.5 7.5 0 00-1.7 1l-2.4-1-2 3.4 2 1.6a7.6 7.6 0 000 2l-2 1.6 2 3.4 2.4-1a7.5 7.5 0 001.7 1l.5 2.6h4l.5-2.6a7.5 7.5 0 001.7-1l2.4 1 2-3.4-2-1.6zM12.2 15.5a3.5 3.5 0 110-7 3.5 3.5 0 010 7z' },

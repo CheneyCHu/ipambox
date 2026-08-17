@@ -148,7 +148,7 @@ mkdir -p "$WORK/upd"
 echo '{"version":"9.9.9","url":"http://127.0.0.1:18334/ipambox","sha256":"","notes":"测试版"}' > "$WORK/upd/latest.json"
 echo '{"version":"1.0.0","url":"http://127.0.0.1:18334/ipambox"}' > "$WORK/upd/same.json"
 cp "$BIN" "$WORK/upd/ipambox"
-(cd "$WORK/upd" && python3 -m http.server 18334 >/dev/null 2>&1 &)
+(cd "$WORK/upd" && python3 -m http.server 18334 --bind 127.0.0.1 >/dev/null 2>&1 &)
 sleep 1
 curl -s -X PUT $B/settings/ -H "$AUTH" -d '{"update_manifest_url":"http://127.0.0.1:18334/latest.json"}' >/dev/null
 check "检查到有更新" "True" "$(curl -s $B/update/check -H "$AUTH" | pyget "['has_update']")"

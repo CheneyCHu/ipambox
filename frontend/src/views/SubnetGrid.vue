@@ -98,7 +98,67 @@ const visible = computed(() =>
 
 // 网格 / 列表视图切换；列表只显示非闲置地址
 const viewMode = ref<'grid' | 'list'>('grid')
-const listRows = computed(() => visible.value.filter(a => a.status !== 'free'))
+const statusFilter = ref('')
+const listRows = computed(() => visible.value.filter(a => {
+  if (a.status === 'free') return false
+  if (statusFilter.value === 'unregistered') return a.status === 'online' && !a.label
+  return !statusFilter.value || a.status === statusFilter.value
+}))
+const unregisteredCount = computed(() => addresses.value.filter(a => a.status === 'online' && !a.label).length)
+
+// ---- 登记地址（保留） ----
+const showReg = ref(false)
+const regIP = ref('')
+const regLabel = ref('')
+const regOwner = ref('')
+const regType = ref('')
+const regErr = ref('')
+const regBusy = ref(false)
+
+// ---- 删除台账记录 ----
+const deleting = ref<IPAddress | null>(null)
+const deleteBusy = ref(false)
+
+// 选中格子/行：同时重置闲置地址的登记表单
+function pick(a: IPAddress) {
+  selected.value = a
+  if (!a.id) { regLabel.value = ''; regOwner.value = ''; regType.value = ''; regErr.value = '' }
+}
+
+function openRegister() {
+  if (!subnetId.value) { error.value = t('请先添加一个子网'); return }
+  regIP.value = ''; regLabel.value = ''; regOwner.value = ''; regType.value = ''; regErr.value = ''
+  showReg.value = true
+}
+
+async function doRegister(ip: string) {
+  regErr.value = ''
+  if (!/^\d+\.\d+\.\d+\.\d+$/.test(ip)) { regErr.value = t('请填写合法的 IPv4 地址'); return }
+  regBusy.value = true
+  try {
+    await api.createAddress(subnetId.value, {
+      ip, status: 'reserved', label: regLabel.value, owner: regOwner.value, dev_type: regType.value,
+    })
+    showReg.value = false
+    notice.value = t('✅ 已登记 {ip}（保留）', { ip })
+    setTimeout(() => (notice.value = ''), 3000)
+    selected.value = null
+    await load()
+  } catch (e: any) { regErr.value = e.message } finally { regBusy.value = false }
+}
+
+async function doDelete() {
+  if (!deleting.value?.id) return
+  deleteBusy.value = true
+  try {
+    await api.deleteAddress(deleting.value.id)
+    notice.value = t('✅ 已删除 {ip} 的台账记录', { ip: deleting.value.ip })
+    setTimeout(() => (notice.value = ''), 3000)
+    deleting.value = null
+    selected.value = null
+    await load()
+  } catch (e: any) { error.value = t('删除失败：') + e.message } finally { deleteBusy.value = false }
+}
 
 async function load() {
   if (!subnetId.value) { addresses.value = []; return }
@@ -199,6 +259,14 @@ onUnmounted(() => poller && clearInterval(poller))
         <input v-model="filter" :placeholder="t('搜索 IP / 标注 / MAC…')"
                class="border border-slate-200 rounded-xl pl-9 pr-3 py-2 w-full text-sm" />
       </div>
+      <select v-if="viewMode === 'list'" v-model="statusFilter" class="border border-slate-200 rounded-xl px-3 py-2 text-sm bg-white cursor-pointer">
+        <option value="">{{ t('全部状态') }}</option>
+        <option value="unregistered">⚠ {{ t('未登记设备') }}</option>
+        <option value="online">{{ t('在线') }}</option>
+        <option value="offline">{{ t('离线') }}</option>
+        <option value="conflict">{{ t('冲突') }}</option>
+        <option value="reserved">{{ t('保留') }}</option>
+      </select>
       <div class="flex bg-slate-100 rounded-xl p-0.5">
         <button @click="viewMode = 'grid'"
                 :class="['px-3 py-1.5 text-xs font-medium rounded-[10px] transition', viewMode === 'grid' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-400 hover:text-slate-600']">
@@ -214,6 +282,10 @@ onUnmounted(() => poller && clearInterval(poller))
         <svg v-if="scanning" class="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-opacity=".25" stroke-width="3"/><path d="M21 12a9 9 0 00-9-9" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>
         <span v-else>⚡</span>
         {{ scanning ? t('扫描中…') : t('立即扫描') }}
+      </button>
+      <button v-if="!isViewer()" @click="openRegister"
+              class="border border-brand-200 text-brand-600 rounded-xl px-4 py-2 text-sm font-medium hover:bg-brand-50 active:scale-95 transition">
+        + {{ t('登记地址') }}
       </button>
       <button v-if="!isViewer()" @click="showAdd = !showAdd"
               class="border border-brand-200 text-brand-600 rounded-xl px-4 py-2 text-sm font-medium hover:bg-brand-50 active:scale-95 transition">
@@ -283,7 +355,7 @@ onUnmounted(() => poller && clearInterval(poller))
                    colors[a.status] || colors.free,
                    a.status === 'free' ? 'text-slate-400' : 'text-white/90',
                    selected?.ip === a.ip ? 'ring-2 ring-brand-600 ring-offset-1 scale-[1.3] z-10' : '']"
-          @click="selected = a"
+          @click="pick(a)"
         >{{ a.ip.split('.').pop() }}<span
             class="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1 z-50 whitespace-nowrap
                    bg-ink-800 text-white text-[10px] leading-tight font-medium font-sans rounded-md px-1.5 py-1 shadow-pop
@@ -302,11 +374,12 @@ onUnmounted(() => poller && clearInterval(poller))
             <th class="px-5 py-3 font-medium">IP</th><th class="px-4 py-3 font-medium">{{ t('状态') }}</th>
             <th class="px-4 py-3 font-medium">MAC</th><th class="px-4 py-3 font-medium">{{ t('主机名') }}</th>
             <th class="px-4 py-3 font-medium">{{ t('标注') }}</th><th class="px-4 py-3 font-medium">{{ t('负责人') }}</th>
-            <th class="px-4 py-3 font-medium">{{ t('最后在线') }}</th>
+            <th class="px-4 py-3 font-medium">{{ t('类型') }}</th><th class="px-4 py-3 font-medium">{{ t('最后在线') }}</th>
+            <th class="px-4 py-3 font-medium text-right">{{ t('操作') }}</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-slate-50">
-          <tr v-for="a in listRows" :key="a.ip" @click="a.id && (selected = a)"
+          <tr v-for="a in listRows" :key="a.ip" @click="a.id && pick(a)"
               :class="['hover:bg-brand-50/40 transition-colors', a.id ? 'cursor-pointer' : '']">
             <td class="px-5 py-2.5 font-mono text-slate-800">{{ a.ip }}</td>
             <td class="px-4 py-2.5">
@@ -318,14 +391,27 @@ onUnmounted(() => poller && clearInterval(poller))
                 {{ statusText(a.status) }}
               </span>
             </td>
-            <td class="px-4 py-2.5 font-mono text-xs text-slate-500">{{ a.mac || '—' }}</td>
+            <td class="px-4 py-2.5 font-mono text-xs text-slate-500">
+              {{ a.mac || '—' }}
+              <div v-if="a.vendor" class="font-sans text-xs text-slate-400 mt-0.5">{{ a.vendor }}</div>
+              <div v-else-if="isRandomMAC(a.mac)" class="font-sans text-xs text-amber-500 mt-0.5">{{ t('随机 MAC（隐私地址）') }}</div>
+            </td>
             <td class="px-4 py-2.5 text-slate-600">{{ a.hostname || '—' }}</td>
-            <td class="px-4 py-2.5 text-slate-700">{{ a.label || '—' }}</td>
+            <td class="px-4 py-2.5">
+              <span v-if="a.label" class="text-slate-700">{{ a.label }}</span>
+              <span v-else-if="a.status === 'online'" class="bg-orange-50 text-rogue text-xs rounded-full px-2 py-0.5 font-medium">{{ t('未登记') }}</span>
+              <span v-else class="text-slate-300">—</span>
+            </td>
             <td class="px-4 py-2.5 text-slate-600">{{ a.owner || '—' }}</td>
+            <td class="px-4 py-2.5 text-slate-600">{{ a.dev_type || '—' }}</td>
             <td class="px-4 py-2.5 text-slate-400 text-xs">{{ fmtTime(a.last_seen) || '—' }}</td>
+            <td class="px-4 py-2.5 text-right whitespace-nowrap" @click.stop>
+              <button v-if="a.id && !isViewer()" @click="pick(a)" class="text-brand-600 hover:text-brand-700 text-xs font-medium mr-3">{{ t('编辑') }}</button>
+              <button v-if="a.id && !isViewer()" @click="deleting = a" class="text-conflict hover:opacity-80 text-xs font-medium">{{ t('删除') }}</button>
+            </td>
           </tr>
           <tr v-if="!listRows.length">
-            <td colspan="7" class="px-4 py-16 text-center text-slate-400">
+            <td colspan="9" class="px-4 py-16 text-center text-slate-400">
               {{ subnets.length ? t('暂无已观测地址，点击「立即扫描」发现设备') : t('还没有受管子网') }}
             </td>
           </tr>
@@ -389,17 +475,85 @@ onUnmounted(() => poller && clearInterval(poller))
             <label class="block text-sm font-medium text-slate-600 mb-2">{{ t('类型') }}
               <DictSelect v-model="selected.dev_type" :options="dictTypes" :placeholder="t('未分类')" /></label>
           </template>
+          <template v-else-if="!isViewer()">
+            <div class="bg-brand-50/60 border border-brand-100 rounded-xl p-4 mb-2">
+              <p class="text-sm font-medium text-slate-700 mb-1">{{ t('登记地址（保留）') }}</p>
+              <p class="text-xs text-slate-400 mb-4">{{ t('用于网关、规划预留等尚未在线的地址；登记后状态为「保留」，不会被扫描判定为闲置。') }}</p>
+              <label class="block text-sm font-medium text-slate-600 mb-3">{{ t('标注') }}
+                <input v-model="regLabel" class="border border-slate-200 rounded-xl w-full px-3 py-2 mt-1.5 font-normal bg-white" :placeholder="t('如：核心网关')" /></label>
+              <label class="block text-sm font-medium text-slate-600 mb-3">{{ t('负责人') }}
+                <DictSelect v-model="regOwner" :options="dictOwners" /></label>
+              <label class="block text-sm font-medium text-slate-600 mb-2">{{ t('类型') }}
+                <DictSelect v-model="regType" :options="dictTypes" :placeholder="t('未分类')" /></label>
+              <p v-if="regErr" class="text-conflict text-sm mt-2">{{ regErr }}</p>
+            </div>
+          </template>
           <div v-else class="bg-slate-50 rounded-xl p-4 text-sm text-slate-400 text-center">
             {{ t('该地址尚未被观测到，扫描发现后即可标注。') }}
           </div>
         </div>
 
         <footer class="px-6 py-4 border-t border-slate-100 flex gap-3">
-          <button v-if="selected.id && !isViewer()" @click="save"
-                  class="flex-1 bg-brand-600 text-white rounded-xl px-4 py-2.5 text-sm font-medium hover:bg-brand-700 active:scale-[0.98] transition shadow-sm shadow-brand-600/30">{{ t('保存标注') }}</button>
+          <template v-if="selected.id && !isViewer()">
+            <button @click="save"
+                    class="flex-1 bg-brand-600 text-white rounded-xl px-4 py-2.5 text-sm font-medium hover:bg-brand-700 active:scale-[0.98] transition shadow-sm shadow-brand-600/30">{{ t('保存标注') }}</button>
+            <button @click="deleting = selected"
+                    class="border border-red-200 text-conflict rounded-xl px-4 py-2.5 text-sm font-medium hover:bg-red-50 active:scale-[0.98] transition">{{ t('删除') }}</button>
+          </template>
+          <button v-else-if="!selected.id && !isViewer()" @click="doRegister(selected.ip)" :disabled="regBusy"
+                  class="flex-1 bg-brand-600 text-white rounded-xl px-4 py-2.5 text-sm font-medium hover:bg-brand-700 active:scale-[0.98] disabled:opacity-50 transition shadow-sm shadow-brand-600/30">
+            {{ regBusy ? t('提交中…') : t('登记为保留地址') }}
+          </button>
           <button @click="selected = null" class="border border-slate-200 rounded-xl px-5 py-2.5 text-sm text-slate-500 hover:bg-slate-50 transition">{{ t('关闭') }}</button>
         </footer>
       </aside>
+    </Teleport>
+
+    <!-- 登记地址弹窗（工具栏入口，手动输入 IP） -->
+    <Teleport to="body">
+      <div v-if="showReg" class="fixed inset-0 bg-slate-900/30 backdrop-blur-[2px] z-40 flex items-center justify-center p-6"
+           @click.self="showReg = false">
+        <div class="bg-white rounded-2xl shadow-pop w-full max-w-md p-6 animate-fade-in">
+          <h3 class="font-semibold text-slate-800 mb-1">{{ t('登记地址（保留）') }}</h3>
+          <p class="text-xs text-slate-400 mb-4">{{ currentSubnet?.cidr }} · {{ t('用于网关、规划预留等尚未在线的地址；登记后状态为「保留」，不会被扫描判定为闲置。') }}</p>
+          <label class="block text-sm font-medium text-slate-600 mb-3">{{ t('IP 地址') }}
+            <input v-model="regIP" :placeholder="t('如：192.168.1.254')" class="border border-slate-200 rounded-xl w-full px-3 py-2 mt-1.5 font-mono font-normal" /></label>
+          <label class="block text-sm font-medium text-slate-600 mb-3">{{ t('标注') }}
+            <input v-model="regLabel" :placeholder="t('如：核心网关')" class="border border-slate-200 rounded-xl w-full px-3 py-2 mt-1.5 font-normal" /></label>
+          <div class="grid grid-cols-2 gap-3 mb-4">
+            <label class="block text-sm font-medium text-slate-600">{{ t('负责人') }}
+              <DictSelect v-model="regOwner" :options="dictOwners" /></label>
+            <label class="block text-sm font-medium text-slate-600">{{ t('类型') }}
+              <DictSelect v-model="regType" :options="dictTypes" /></label>
+          </div>
+          <p v-if="regErr" class="text-conflict text-sm mb-3">{{ regErr }}</p>
+          <div class="flex gap-3">
+            <button @click="doRegister(regIP)" :disabled="regBusy"
+                    class="bg-brand-600 text-white rounded-xl px-5 py-2 flex-1 text-sm font-medium hover:bg-brand-700 active:scale-[0.98] disabled:opacity-50 transition">
+              {{ regBusy ? t('提交中…') : t('登记') }}
+            </button>
+            <button @click="showReg = false" class="border border-slate-200 rounded-xl px-5 py-2 text-sm text-slate-500 hover:bg-slate-50 transition">{{ t('取消') }}</button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- 删除台账记录确认 -->
+    <Teleport to="body">
+      <div v-if="deleting" class="fixed inset-0 bg-slate-900/30 backdrop-blur-[2px] z-[60] flex items-center justify-center p-6"
+           @click.self="deleting = null">
+        <div class="bg-white rounded-2xl shadow-pop w-full max-w-sm p-6 animate-fade-in">
+          <h3 class="font-semibold text-conflict mb-2">{{ t('删除 {ip} 的台账记录？', { ip: deleting.ip }) }}</h3>
+          <p class="text-sm text-slate-500 mb-5">{{ t('仅删除台账与标注；若设备仍在线，下次扫描会重新出现（无标注）。') }}</p>
+          <div class="flex gap-3">
+            <button @click="doDelete" :disabled="deleteBusy"
+                    class="bg-conflict text-white rounded-xl px-5 py-2 flex-1 text-sm font-medium hover:opacity-90 active:scale-[0.98] disabled:opacity-50 transition">
+              {{ deleteBusy ? t('删除中…') : t('确认删除') }}
+            </button>
+            <button @click="deleting = null" class="border border-slate-200 rounded-xl px-5 py-2 text-sm text-slate-500 hover:bg-slate-50 transition">{{ t('取消') }}</button>
+          </div>
+        </div>
+      </div>
     </Teleport>
   </div>
 </template>

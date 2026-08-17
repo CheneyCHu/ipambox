@@ -18,7 +18,7 @@ export function setLang(l: Lang) {
 const zh: Record<string, string> = {
   // 导航 / 框架
   'nav.dashboard': '仪表盘', 'nav.map': 'IP 地图', 'nav.subnets': '子网管理',
-  'nav.network': '网络设置', 'nav.routes': '路由设置', 'nav.devices': '设备台账',
+  'nav.network': '网络设置', 'nav.routes': '路由设置',
   'nav.alerts': '告警', 'nav.reports': '报表', 'nav.settings': '设置',
   'app.brand.sub': 'IP 地址管理', 'app.readonly': '只读',
   'app.collapse': '折叠菜单', 'app.expand': '展开菜单', 'app.logout': '退出登录',
@@ -45,7 +45,7 @@ const zh: Record<string, string> = {
 
 const en: Record<string, string> = {
   'nav.dashboard': 'Dashboard', 'nav.map': 'IP Map', 'nav.subnets': 'Subnets',
-  'nav.network': 'Network', 'nav.routes': 'Routes', 'nav.devices': 'Devices',
+  'nav.network': 'Network', 'nav.routes': 'Routes',
   'nav.alerts': 'Alerts', 'nav.reports': 'Reports', 'nav.settings': 'Settings',
   'app.brand.sub': 'IP Address Manager', 'app.readonly': 'Read-only',
   'app.collapse': 'Collapse', 'app.expand': 'Expand', 'app.logout': 'Sign out',
@@ -278,6 +278,7 @@ const enZh: Record<string, string> = {
   '删除 {ip} 的台账记录？': 'Delete the inventory record of {ip}?',
   '仅删除台账与标注；若设备仍在线，下次扫描会重新出现（无标注）。': 'Only the inventory record and label are removed; if the device is still online it will reappear (unlabeled) after the next scan.',
   '登记地址（保留）': 'Register address (reserved)',
+  '登记为保留地址': 'Register as reserved',
   '用于网关、规划预留等尚未在线的地址；登记后状态为「保留」，不会被扫描判定为闲置。': 'For gateways or planned addresses not yet online; registered as "Reserved" so scans will not mark them free.',
   'IP 地址': 'IP address',
   '如：192.168.1.254': 'e.g. 192.168.1.254',

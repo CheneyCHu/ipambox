@@ -14,7 +14,7 @@ const router = createRouter({
     { path: '/dashboard', component: () => import('./views/Dashboard.vue') },
     { path: '/subnets/:id?', component: () => import('./views/SubnetGrid.vue') },
     { path: '/subnet-mgr', component: () => import('./views/Subnets.vue') },
-    { path: '/devices', component: () => import('./views/Devices.vue') },
+    { path: '/devices', redirect: '/subnets' }, // 设备台账已并入 IP 地图
     { path: '/alerts', component: () => import('./views/Alerts.vue') },
     { path: '/reports', component: () => import('./views/Reports.vue') },
     { path: '/network', component: () => import('./views/NetworkSettings.vue') },
