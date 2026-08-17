@@ -155,18 +155,28 @@ func (e *Engine) scanSubnet(ctx context.Context, sub models.Subnet) error {
 	}
 	// 反向 DNS 解析主机名（并发、单个限时，失败静默）
 	hosts := resolveHostnames(seen)
+	// 未授权设备告警开关（每轮读一次，支持热更新）
+	rogueEnabled, _ := e.db.GetSetting("rogue_alert_enabled")
+	skipRandom, _ := e.db.GetSetting("rogue_alert_skip_random_mac")
+	rogueOn := rogueEnabled != "0"       // 默认开启
+	skipRnd := skipRandom != "0"         // 默认跳过随机 MAC
 	for _, o := range seen {
 		vendor, devType := "", ""
 		if o.MAC != "" {
 			vendor = oui.Lookup(o.MAC)      // OUI 厂商识别
 			devType = oui.InferType(o.MAC)  // 类型推断（不覆盖人工填写）
 		}
-		if err := e.db.MarkSeenRich(o.IP, o.MAC, hosts[o.IP], vendor, devType, o.Source); err != nil {
+		created, err := e.db.MarkSeenRich(o.IP, o.MAC, hosts[o.IP], vendor, devType, o.Source)
+		if err != nil {
 			log.Printf("scanner: mark seen %s: %v", o.IP, err)
 		}
-		// 冲突检测：同一 IP 出现新 MAC → 告警
 		if e.alerter != nil {
+			// 冲突检测：同一 IP 出现新 MAC → 告警
 			e.alerter.CheckConflict(o.IP, o.MAC)
+			// 未授权设备：首次入库的新地址 → 告警（可选跳过随机 MAC）
+			if created && rogueOn && !(o.MAC != "" && skipRnd && oui.IsRandom(o.MAC)) {
+				e.alerter.NotifyRogue(o.IP, o.MAC, vendor)
+			}
 		}
 	}
 	// 离线判定：上一轮在线而本轮未出现的地址降级为 offline

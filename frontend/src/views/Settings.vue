@@ -19,6 +19,10 @@ const scanSaving = ref(false)
 const uplinkProbe = ref('223.5.5.5:53,114.114.114.114:53')
 const uplinkCheckSec = ref(30)
 
+// ---- 未授权设备告警 ----
+const rogueAlert = ref(true)
+const skipRandomMac = ref(true)
+
 // ---- 系统升级（OTA） ----
 const appVersion = ref('')
 const updateMsg = ref('')
@@ -227,6 +231,8 @@ onMounted(async () => {
   if (s) {
     scanInterval.value = Number(s.scan_interval_min) || 5
     autoScan.value = s.auto_scan !== '0'
+    rogueAlert.value = s.rogue_alert_enabled !== '0'
+    skipRandomMac.value = s.rogue_alert_skip_random_mac !== '0'
     uplinkProbe.value = s.uplink_probe || '223.5.5.5:53,114.114.114.114:53'
     uplinkCheckSec.value = Number(s.uplink_check_sec) || 30
     devTypes.value = parseList(s.dev_types)
@@ -235,7 +241,7 @@ onMounted(async () => {
     notifyChannel.value = s.notify_channel || 'webhook'
     notifyWebhook.value = s.notify_webhook || ''
     notifySecret.value = s.notify_secret || ''
-    notifyEvents.value = (s.notify_events || 'conflict,offline').split(',').filter(Boolean)
+    notifyEvents.value = (s.notify_events || 'conflict,offline,rogue').split(',').filter(Boolean)
   }
   const vs = await api.viewerStatus().catch(() => null)
   if (vs) viewerEnabled.value = vs.enabled
@@ -247,6 +253,8 @@ async function saveScan() {
     await api.saveSettings({
       scan_interval_min: String(scanInterval.value),
       auto_scan: autoScan.value ? '1' : '0',
+      rogue_alert_enabled: rogueAlert.value ? '1' : '0',
+      rogue_alert_skip_random_mac: skipRandomMac.value ? '1' : '0',
       uplink_probe: uplinkProbe.value,
       uplink_check_sec: String(uplinkCheckSec.value),
     })
@@ -352,6 +360,24 @@ function jump(id: string) {
           </div>
           <p class="text-[11px] text-slate-400 mt-1.5">{{ t('离线期间扫描与台账照常记录，通知暂存队列、恢复后自动补发。') }}</p>
         </div>
+        <div class="border-t border-slate-100 pt-3 mb-3">
+          <p class="text-xs font-medium text-slate-500 mb-2">{{ t('未授权设备告警') }}</p>
+          <label class="flex items-center justify-between text-sm text-slate-600 mb-2 cursor-pointer max-w-sm">
+            {{ t('新设备首次入网时产生告警') }}
+            <button @click="rogueAlert = !rogueAlert" type="button"
+                    :class="['w-10 h-6 rounded-full transition relative shrink-0', rogueAlert ? 'bg-brand-600' : 'bg-slate-200']">
+              <i :class="['absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-all', rogueAlert ? 'left-5' : 'left-1']"></i>
+            </button>
+          </label>
+          <label class="flex items-center justify-between text-sm text-slate-600 cursor-pointer max-w-sm" :class="rogueAlert ? '' : 'opacity-40 pointer-events-none'">
+            {{ t('随机 MAC 设备不触发未授权告警') }}
+            <button @click="skipRandomMac = !skipRandomMac" type="button"
+                    :class="['w-10 h-6 rounded-full transition relative shrink-0', skipRandomMac ? 'bg-brand-600' : 'bg-slate-200']">
+              <i :class="['absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-all', skipRandomMac ? 'left-5' : 'left-1']"></i>
+            </button>
+          </label>
+          <p class="text-[11px] text-slate-400 mt-1.5">{{ t('iOS/Android 的「私有地址」会定期变化，跳过后可避免同一台设备反复告警。') }}</p>
+        </div>
         <button @click="saveScan" :disabled="scanSaving"
                 class="bg-brand-600 text-white rounded-xl px-4 py-2 text-sm font-medium hover:bg-brand-700 active:scale-95 disabled:opacity-50 transition">
           {{ scanSaving ? t('保存中…') : t('保存') }}
@@ -399,6 +425,9 @@ function jump(id: string) {
             </label>
             <label class="flex items-center gap-1.5 cursor-pointer">
               <input type="checkbox" :checked="notifyEvents.includes('offline')" @change="toggleEvent('offline')" class="accent-brand-600" /> {{ t('设备离线') }}
+            </label>
+            <label class="flex items-center gap-1.5 cursor-pointer">
+              <input type="checkbox" :checked="notifyEvents.includes('rogue')" @change="toggleEvent('rogue')" class="accent-brand-600" /> {{ t('未授权设备') }}
             </label>
           </div>
         </div>

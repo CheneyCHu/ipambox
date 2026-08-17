@@ -54,6 +54,12 @@ for i in $(seq 1 15); do
 done
 check "扫描发现 127.0.0.1" "online" "$SCAN_ST"
 check "统计 online=1" "1" "$(curl -s $B/subnets/1/stats -H "$AUTH" | pyget "['online']")"
+# 未授权设备告警：首次发现新地址应产生 rogue 告警（默认开启）
+check "rogue 告警已产生" "1" "$(curl -s $B/alerts/ -H "$AUTH" | python3 -c 'import sys,json;a=json.load(sys.stdin);print(1 if any(x["type"]=="rogue" for x in a) else 0)')"
+# skip_random 设置的读写
+curl -s -X PUT $B/settings/ -H "$AUTH" -d '{"rogue_alert_skip_random_mac":"0"}' >/dev/null
+check "skip_random 设置回读" "0" "$(curl -s $B/settings/ -H "$AUTH" | pyget "['rogue_alert_skip_random_mac']")"
+curl -s -X PUT $B/settings/ -H "$AUTH" -d '{"rogue_alert_skip_random_mac":"1"}' >/dev/null
 
 echo "==> 4. 标注"
 curl -s -X PATCH $B/addresses/1 -H "$AUTH" -d '{"label":"本机回环","owner":"ops","dev_type":"服务器"}' >/dev/null
@@ -186,6 +192,15 @@ echo "==> 10h. 安全：登录爆破锁定"
 for i in 1 2 3 4 5; do curl -s -o /dev/null -X POST $B/setup/login -d '{"password":"wrong-pass"}'; done
 check "第 6 次错误登录被锁定 429" "429" "$(curl -s -o /dev/null -w '%{http_code}' -X POST $B/setup/login -d '{"password":"wrong-pass"}')"
 check "锁定期间正确密码也 429" "429" "$(curl -s -o /dev/null -w '%{http_code}' -X POST $B/setup/login -d '{"password":"admin123"}')"
+
+echo "==> 10i. 未授权告警开关：关闭后删除地址重扫不再产生 rogue 告警"
+curl -s -X PUT $B/settings/ -H "$AUTH" -d '{"rogue_alert_enabled":"0"}' >/dev/null
+BEFORE=$(curl -s $B/alerts/ -H "$AUTH" | python3 -c 'import sys,json;print(len(json.load(sys.stdin)))')
+curl -s -X DELETE $B/addresses/1 -H "$AUTH" >/dev/null
+curl -s -X POST $B/subnets/1/scan -H "$AUTH" >/dev/null; sleep 6
+AFTER=$(curl -s $B/alerts/ -H "$AUTH" | python3 -c 'import sys,json;print(len(json.load(sys.stdin)))')
+check "关闭开关后不再产生 rogue 告警" "$BEFORE" "$AFTER"
+curl -s -X PUT $B/settings/ -H "$AUTH" -d '{"rogue_alert_enabled":"1"}' >/dev/null
 
 echo "==> 11. 重置流程"
 check "重置成功" "reset" "$(curl -s -X POST $B/setup/reset -H "$AUTH" | pyget "['status']")"

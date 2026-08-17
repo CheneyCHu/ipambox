@@ -551,27 +551,34 @@ func (s *Store) SubnetIDForIP(ipStr string) (int64, bool, error) {
 // MarkSeen 由扫描引擎调用：插入事件并刷新地址状态。
 // mac/hostname 为空时保留已有值，避免后续观测把已获取的信息清空。
 func (s *Store) MarkSeen(ip, mac, hostname, source string) error {
-	return s.MarkSeenRich(ip, mac, hostname, "", "", source)
+	_, err := s.MarkSeenRich(ip, mac, hostname, "", "", source)
+	return err
 }
 
 // MarkSeenRich 在 MarkSeen 基础上携带厂商与推断设备类型：
 // vendor 非空则刷新；devType 仅在该地址从未填写类型时补写（不覆盖人工修改）。
-func (s *Store) MarkSeenRich(ip, mac, hostname, vendor, devType, source string) error {
+// created 为 true 表示该 IP 是首次入库的新地址（供未授权设备告警等使用）。
+func (s *Store) MarkSeenRich(ip, mac, hostname, vendor, devType, source string) (bool, error) {
 	subnetID, ok, err := s.SubnetIDForIP(ip)
 	if err != nil {
-		return err
+		return false, err
 	}
 	if !ok {
-		return nil // 未受管网段的观测直接忽略
+		return false, nil // 未受管网段的观测直接忽略
 	}
 	tx, err := s.db.Begin()
 	if err != nil {
-		return err
+		return false, err
 	}
 	defer tx.Rollback()
 	if _, err := tx.Exec(`INSERT INTO scan_events(ip,mac,source) VALUES(?,?,?)`, ip, mac, source); err != nil {
-		return err
+		return false, err
 	}
+	var exists int
+	if err := tx.QueryRow(`SELECT 1 FROM addresses WHERE subnet_id=? AND ip=?`, subnetID, ip).Scan(&exists); err != nil && err != sql.ErrNoRows {
+		return false, err
+	}
+	created := exists == 0
 	_, err = tx.Exec(`
 		INSERT INTO addresses(subnet_id,ip,status,mac,hostname,vendor,dev_type,first_seen,last_seen)
 		VALUES(?, ?, 'online', ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
@@ -583,9 +590,9 @@ func (s *Store) MarkSeenRich(ip, mac, hostname, vendor, devType, source string) 
 		  dev_type=CASE WHEN addresses.dev_type='' THEN excluded.dev_type ELSE addresses.dev_type END`,
 		subnetID, ip, mac, hostname, vendor, devType)
 	if err != nil {
-		return err
+		return false, err
 	}
-	return tx.Commit()
+	return created, tx.Commit()
 }
 
 // ListMissingVendor 返回有 MAC 但尚未识别厂商的地址（启动回填用）。

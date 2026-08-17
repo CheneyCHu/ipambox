@@ -16,10 +16,36 @@ import (
 type Alerter struct {
 	db       *store.Store
 	knownMAC map[string]string // ip -> 上次观测到的 MAC（内存态，重启后重建）
+	rogueHit map[string]bool   // "ip|mac" -> 已告警过（内存态，重启后重建）
 }
 
 func New(db *store.Store) *Alerter {
-	return &Alerter{db: db, knownMAC: map[string]string{}}
+	return &Alerter{db: db, knownMAC: map[string]string{}, rogueHit: map[string]bool{}}
+}
+
+// NotifyRogue 首次发现未登记设备时产生未授权告警（同一 ip+mac 只报一次）。
+func (a *Alerter) NotifyRogue(ip, mac, vendor string) {
+	key := ip + "|" + mac
+	if a.rogueHit[key] {
+		return
+	}
+	a.rogueHit[key] = true
+	vendorText := vendor
+	if vendorText == "" {
+		vendorText = "未知厂商"
+	}
+	msg := "发现未授权设备：" + ip
+	if mac != "" {
+		msg += "（MAC " + mac + "，" + vendorText + "）"
+	}
+	params, _ := json.Marshal(map[string]any{"ip": ip, "mac": mac, "vendor": vendor})
+	a.raise(&models.Alert{
+		Type:    "rogue",
+		Level:   "warn",
+		Message: msg,
+		Params:  string(params),
+		IP:      ip,
+	})
 }
 
 // CheckConflict 同一 IP 的 MAC 发生变化时产生冲突告警。

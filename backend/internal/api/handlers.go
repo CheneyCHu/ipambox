@@ -262,7 +262,10 @@ var settingsWhitelist = map[string]string{
 	"notify_channel": "webhook",          // webhook / dingtalk / wecom
 	"notify_webhook": "",                 // Webhook 地址
 	"notify_secret":  "",                 // 钉钉加签密钥（可选）
-	"notify_events":  "conflict,offline", // 关注的事件类型（逗号分隔）
+	"notify_events":  "conflict,offline,rogue", // 关注的事件类型（逗号分隔）
+	// 未授权设备告警
+	"rogue_alert_enabled":         "1", // 新设备首次入网时产生告警
+	"rogue_alert_skip_random_mac": "1", // 随机 MAC（私有地址）不触发未授权告警
 	// 外网连通探测（断网续存）
 	"uplink_probe":     "223.5.5.5:53,114.114.114.114:53", // 探测目标（host:port，逗号分隔多个）
 	"uplink_check_sec": "30",                              // 探测间隔（秒，5~3600）

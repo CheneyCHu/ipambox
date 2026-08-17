@@ -56,6 +56,26 @@ func normPrefix(mac string) string {
 	return ""
 }
 
+// IsRandom 判断是否为随机/本地管理 MAC（LAA，首字节第 2 位置位）。
+// iOS/Android/Windows 的"私有地址"功能均生成此类地址，无法对应真实厂商。
+func IsRandom(mac string) bool {
+	p := normPrefix(mac)
+	if len(p) < 2 {
+		return false
+	}
+	var b int
+	for _, c := range p[:2] {
+		b <<= 4
+		switch {
+		case c >= '0' && c <= '9':
+			b |= int(c - '0')
+		default:
+			b |= int(c-'A') + 10
+		}
+	}
+	return b&0x02 != 0
+}
+
 // Lookup 返回 MAC 对应的厂商简称，未收录返回空串。
 func Lookup(mac string) string {
 	p := normPrefix(mac)

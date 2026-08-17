@@ -14,6 +14,10 @@ function msgOf(a: Alert): string {
   switch (a.type) {
     case 'conflict':
       return `MAC of IP ${p.ip} changed from ${p.prev} to ${p.mac}, possible address conflict`
+    case 'rogue':
+      return p.mac
+        ? `Unauthorized device found: ${p.ip} (MAC ${p.mac}, ${p.vendor || 'unknown vendor'})`
+        : `Unauthorized device found: ${p.ip}`
     case 'offline': {
       const ips: string[] = p.ips || []
       const show = ips.slice(0, 5).join(', ')
