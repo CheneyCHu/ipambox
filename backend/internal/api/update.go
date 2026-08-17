@@ -129,16 +129,89 @@ func fetchManifest(url string) (*updateManifest, error) {
 }
 
 // fetchManifestAny 依次尝试候选清单地址，全部失败时返回最后一个错误。
+// 内置默认源全部失败时，再回落到 GitHub Releases API（api.github.com 国内通常可达）。
 func (h *handlers) fetchManifestAny() (*updateManifest, error) {
+	urls := h.manifestURLs()
 	var lastErr error
-	for _, u := range h.manifestURLs() {
+	for _, u := range urls {
 		m, err := fetchManifest(u)
 		if err == nil {
 			return m, nil
 		}
 		lastErr = err
 	}
+	// 仅当使用的是内置默认源时才追加 API 兜底（自定义内网清单不打扰）
+	custom := false
+	if v, _ := h.db.GetSetting("update_manifest_url"); strings.TrimSpace(v) != "" {
+		custom = true
+		for _, d := range defaultManifestURLs {
+			if strings.TrimSpace(v) == d {
+				custom = false
+			}
+		}
+	}
+	if !custom {
+		if m, err := fetchLatestReleaseAPI(); err == nil {
+			return m, nil
+		}
+	}
 	return nil, lastErr
+}
+
+// ghReleaseAPI GitHub Releases 最新发布查询地址（兜底清单源）。
+const ghReleaseAPI = "https://api.github.com/repos/CheneyCHu/ipambox/releases/latest"
+
+// fetchLatestReleaseAPI 通过 GitHub API 构造更新清单：
+// tag_name → 版本，body → 更新说明，资产命名约定 ipambox_<os>_<arch>。
+func fetchLatestReleaseAPI() (*updateManifest, error) {
+	client := &http.Client{Timeout: 15 * time.Second}
+	req, _ := http.NewRequest("GET", ghReleaseAPI, nil)
+	req.Header.Set("Accept", "application/vnd.github+json")
+	req.Header.Set("User-Agent", "ipambox-updater")
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("GitHub API 不可达: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		return nil, fmt.Errorf("GitHub API 返回 HTTP %d", resp.StatusCode)
+	}
+	var rel struct {
+		TagName string `json:"tag_name"`
+		Body    string `json:"body"`
+		Assets  []struct {
+			Name string `json:"name"`
+			URL  string `json:"browser_download_url"`
+		} `json:"assets"`
+	}
+	if err := json.NewDecoder(io.LimitReader(resp.Body, 1<<20)).Decode(&rel); err != nil {
+		return nil, fmt.Errorf("GitHub API 响应格式错误: %v", err)
+	}
+	if rel.TagName == "" {
+		return nil, fmt.Errorf("GitHub API 未返回版本号")
+	}
+	m := &updateManifest{
+		Version: strings.TrimPrefix(rel.TagName, "v"),
+		Notes:   rel.Body,
+		Platforms: map[string]struct {
+			URL    string `json:"url"`
+			SHA256 string `json:"sha256"`
+		}{},
+	}
+	for _, a := range rel.Assets {
+		key := strings.TrimPrefix(a.Name, "ipambox_")
+		if key == a.Name || key == "" {
+			continue // 非平台包（如 sha256 清单）跳过
+		}
+		m.Platforms[key] = struct {
+			URL    string `json:"url"`
+			SHA256 string `json:"sha256"`
+		}{URL: a.URL}
+	}
+	if _, _, err := m.forThisDevice(); err != nil {
+		return nil, err
+	}
+	return m, nil
 }
 
 // UpdateCheck 检查是否有新版本（不下载）。
