@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { api, isViewer, type DeviceRow, type Subnet } from '../api'
 import { t } from '../i18n'
+import { isRandomMAC } from '../utils/mac'
 import DictSelect from '../components/DictSelect.vue'
 
 const devices = ref<DeviceRow[]>([])
@@ -215,6 +216,7 @@ async function doAdd() {
             <td class="px-4 py-3 font-mono text-xs text-slate-500">
               {{ d.mac || '—' }}
               <div v-if="d.vendor" class="font-sans text-xs text-slate-400 mt-0.5">{{ d.vendor }}</div>
+              <div v-else-if="isRandomMAC(d.mac)" class="font-sans text-xs text-amber-500 mt-0.5">{{ t('随机 MAC（隐私地址）') }}</div>
             </td>
             <td class="px-4 py-3 text-slate-600">{{ d.hostname || '—' }}</td>
             <td class="px-4 py-3">

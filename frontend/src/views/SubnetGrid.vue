@@ -3,6 +3,7 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { api, isViewer, type IPAddress, type Subnet, type NICInfo } from '../api'
 import { t } from '../i18n'
+import { isRandomMAC } from '../utils/mac'
 import DictSelect from '../components/DictSelect.vue'
 
 const route = useRoute()
@@ -362,7 +363,9 @@ onUnmounted(() => poller && clearInterval(poller))
             </div>
             <div class="bg-slate-50 rounded-xl p-3">
               <dt class="text-xs text-slate-400 mb-1">{{ t('厂商') }}</dt>
-              <dd class="text-sm text-slate-700 break-all">{{ selected.vendor || '—' }}</dd>
+              <dd class="text-sm text-slate-700 break-all">
+                {{ selected.vendor || (isRandomMAC(selected.mac) ? t('随机 MAC（隐私地址）') : '—') }}
+              </dd>
             </div>
             <div class="bg-slate-50 rounded-xl p-3">
               <dt class="text-xs text-slate-400 mb-1">{{ t('主机名') }}</dt>
